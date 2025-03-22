@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   transparentHeader: {
-    paddingTop: Platform.OS === "ios" ? 50 : 20,
+    paddingTop: Platform.OS === "ios" ? 0 : 20,
     paddingHorizontal: 18,
     backgroundColor: "transparent",
     position: "absolute",

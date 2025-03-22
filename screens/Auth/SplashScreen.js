@@ -7,6 +7,8 @@ import { useNavigation } from "@react-navigation/native";
 export default function SplashScreen() {
   const navigation = useNavigation();
   useEffect(() => {
+    // AsyncStorage.removeItem("userdetails");
+    // AsyncStorage.removeItem("usermobile");
     // AsyncStorage.removeItem("token");
     const checkToken = async () => {
       try {

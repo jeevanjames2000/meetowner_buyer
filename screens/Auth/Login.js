@@ -1,6 +1,6 @@
 import { useNavigation } from "@react-navigation/native";
 import { Image, Input, Button } from "native-base";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -16,13 +16,19 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useDispatch } from "react-redux";
 import { setLoggedIn } from "../../store/slices/authSlice";
+import {
+  setCities,
+  setDeviceLocation,
+} from "../../store/slices/propertyDetails";
+import * as Location from "expo-location";
 export default function LoginScreen() {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  const [mobile, setMobile] = useState("");
+  const [mobile, setMobile] = useState("6302816551");
   const handleChange = (text) => setMobile(text);
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState([]);
+
   const handleLoginform = async () => {
     if (mobile === "" || mobile.length !== 10) {
       Alert.alert("Error", "Please enter a valid 10-digit mobile number.");

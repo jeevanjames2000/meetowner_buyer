@@ -18,6 +18,7 @@ import {
   IconButton,
   Actionsheet,
   useDisclose,
+  Button,
 } from "native-base";
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -164,6 +165,7 @@ const PropertyCard = memo(({ item, onPress, onFav, onShare, onNavigate }) => {
         width="95%"
         alignSelf="center"
         my={1}
+        mb={3}
         onPress={() => onNavigate(item)}
       >
         <Text color="white" bold>
@@ -180,7 +182,6 @@ const formatToIndianCurrency = (value) => {
   return value.toString();
 };
 export default function Properties({ activeTab }) {
-  console.log("activeTab: ", activeTab);
   const dispatch = useDispatch();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -192,25 +193,41 @@ export default function Properties({ activeTab }) {
   const navigation = useNavigation();
   const { isOpen, onOpen, onClose } = useDisclose();
   const [userInfo, setUserInfo] = useState("");
+  console.log("userInfo: ", userInfo);
   const fetchProperties = useCallback(
     async (reset = false) => {
       setLoading(true);
-      const cityId = await AsyncStorage.getItem("city_id");
-      console.log("cityId: ", cityId);
+      if (reset) {
+        const cachedData = await AsyncStorage.getItem("cached_properties");
+        if (cachedData) {
+          setProperties(JSON.parse(cachedData));
+          setLoading(false);
+          setHasMore(true);
+          return;
+        }
+      }
+      const city = await AsyncStorage.getItem("city_id");
+      const cityId = JSON.parse(city);
       try {
         const response = await fetch(
-          `https://api.meetowner.in/listings/getlatestproperties?limit=100&type_of_property=${activeTab}&city_id=${
-            cityId ? parseInt(cityId, 10) : ""
-          }&page=${reset ? 1 : page}`
+          `https://api.meetowner.in/listings/getlatestproperties?limit=${
+            reset ? 30 : 10
+          }&type_of_property=${activeTab}&city_id=6&page=${reset ? 1 : page}`
         );
         const data = await response.json();
-        console.log("data: ", data);
         if (data.propertiesData && data.propertiesData.length > 0) {
-          setProperties((prev) =>
-            reset ? data.propertiesData : [...prev, ...data.propertiesData]
-          );
+          const newProperties = reset
+            ? data.propertiesData
+            : [...properties, ...data.propertiesData];
+          setProperties(newProperties);
           setPage(reset ? 2 : page + 1);
-          setHasMore(true);
+          setHasMore(data.propertiesData.length === (reset ? 30 : 10));
+          if (reset) {
+            await AsyncStorage.setItem(
+              "cached_properties",
+              JSON.stringify(data.propertiesData.slice(0, 10))
+            );
+          }
         } else {
           setHasMore(false);
         }
@@ -221,26 +238,26 @@ export default function Properties({ activeTab }) {
         if (reset) setRefreshing(false);
       }
     },
-    [activeTab, page, dispatch] // Added required dependencies
+    [activeTab, page, properties]
   );
 
   const handleInterestAPI = async (unique_property_id, action) => {
-    console.log("unique_property_id, action: ", unique_property_id, action);
     try {
       const response = await fetch(
-        `${config.mainapi_url}/favourites_exe?user_id=${userInfo.user_id}&unique_property_id=${unique_property_id}&intrst=1&action=${action}`
+        `${config.mainapi_url}/favourites_exe?user_id=${userInfo?.user_id}&unique_property_id=${unique_property_id}&intrst=1&action=0`
       );
       if (!response.ok) {
         throw new Error("Network response was not ok");
       }
+
       const contentLength = response.headers.get("content-length");
       if (contentLength && parseInt(contentLength) === 0) {
         return;
       }
+
       const data = await response.json();
-      console.log("API Response:", data);
     } catch (error) {
-      console.error("Error:", error.message);
+      console.error("Error:", error);
       Alert.alert("Error", "Something went wrong. Please try again.");
     }
   };
@@ -269,17 +286,15 @@ export default function Properties({ activeTab }) {
       console.log("error", error.message);
     }
   };
-  const handleFavourites = useCallback(
-    async (item, isLiked) => {
-      try {
-        const action = isLiked ? 1 : 0;
-        await handleInterestAPI(item.unique_property_id, action);
-      } catch (error) {
-        console.error("Error updating favourites:", error.message);
-      }
-    },
-    [dispatch]
-  );
+  const handleFavourites = useCallback(async (item, isLiked) => {
+    try {
+      const action = isLiked ? 0 : 1;
+      console.log("item, isLiked: ", item.unique_property_id, action);
+      handleInterestAPI(item.unique_property_id, action);
+    } catch (error) {
+      console.error("Error updating favourites:", error.message);
+    }
+  }, []);
   const handleShare = useCallback((item) => {
     shareProperty(item);
   }, []);
@@ -307,12 +322,6 @@ export default function Properties({ activeTab }) {
     if (offsetY > 100 && !showScrollToTop) {
       setShowScrollToTop(true);
     } else if (offsetY <= 0 && showScrollToTop) {
-      setShowScrollToTop(false);
-    }
-  };
-  const scrollToTop = () => {
-    if (flatListRef.current) {
-      flatListRef.current.scrollToOffset({ offset: 0, animated: true });
       setShowScrollToTop(false);
     }
   };
@@ -362,7 +371,6 @@ export default function Properties({ activeTab }) {
               py={3}
               px={4}
               onPress={() => {
-                console.log("Filter: Rent");
                 onClose();
               }}
             >
@@ -373,7 +381,6 @@ export default function Properties({ activeTab }) {
               py={3}
               px={4}
               onPress={() => {
-                console.log("Filter: Sale");
                 onClose();
               }}
             >
@@ -387,7 +394,6 @@ export default function Properties({ activeTab }) {
               py={3}
               px={4}
               onPress={() => {
-                console.log("Filter: Sale");
                 onClose();
               }}
             >
@@ -395,39 +401,53 @@ export default function Properties({ activeTab }) {
             </Pressable>
           </Actionsheet.Content>
         </Actionsheet>
-        <FlatList
-          ref={flatListRef}
-          data={properties}
-          keyExtractor={(item, index) => `${item.unique_property_id}-${index}`}
-          renderItem={renderPropertyCard}
-          onEndReached={() => {
-            if (!loading) fetchProperties();
-          }}
-          onEndReachedThreshold={0.5}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          nestedScrollEnabled={true}
-          initialNumToRender={10}
-          windowSize={windowSize}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
-          removeClippedSubviews={true}
-          ListEmptyComponent={() =>
-            !loading && <Text>No properties found for {activeTab}.</Text>
-          }
-        />
-        {showScrollToTop && (
-          <IconButton
-            position="absolute"
-            bottom={100}
-            right={5}
-            bg="white"
-            borderRadius="full"
-            shadow={3}
-            icon={<Ionicons name="arrow-up" size={24} color="#1D3A76" />}
-            onPress={scrollToTop}
+        <View style={{ flex: 1, paddingBottom: 50 }}>
+          <FlatList
+            ref={flatListRef}
+            data={properties}
+            keyExtractor={(item, index) =>
+              `${item.unique_property_id}-${index}`
+            }
+            renderItem={renderPropertyCard}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            nestedScrollEnabled={true}
+            initialNumToRender={10}
+            windowSize={10}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews={true}
+            contentContainerStyle={{ paddingBottom: 80 }}
+            ListFooterComponent={() =>
+              hasMore && (
+                <View
+                  style={{
+                    marginBottom: 40,
+                    alignItems: "center",
+                    width: "100%",
+                  }}
+                >
+                  <Button
+                    borderRadius={30}
+                    width={"30%"}
+                    py={1}
+                    bgColor={"#FBAF01"}
+                    onPress={() => fetchProperties(false)}
+                    isLoading={loading}
+                    disabled={loading || !hasMore}
+                  >
+                    <Text color={"#000"}>
+                      {loading ? "Loading..." : "Load More"}
+                    </Text>
+                  </Button>
+                </View>
+              )
+            }
+            ListEmptyComponent={() =>
+              !loading && <Text>No properties found for {activeTab}.</Text>
+            }
           />
-        )}
+        </View>
       </View>
     </ScrollView>
   );

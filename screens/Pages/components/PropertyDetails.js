@@ -1,27 +1,89 @@
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-} from "react-native";
+import React, { useState } from "react";
+import { StyleSheet, ScrollView, Image, TouchableOpacity } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
-import { HStack } from "native-base";
+import { Button, HStack, VStack, View, Text } from "native-base";
 export default function PropertyDetails() {
   const property = useSelector((state) => state.property.propertyDetails);
+  console.log("property: ", property);
+  const formatToIndianCurrency = (value) => {
+    if (value >= 10000000) return (value / 10000000).toFixed(2) + " Cr";
+    if (value >= 100000) return (value / 100000).toFixed(2) + " L";
+    if (value >= 1000) return (value / 1000).toFixed(2) + " K";
+    return value.toString();
+  };
+  const [showFullText, setShowFullText] = useState(false);
+
+  const isLongText = property?.description?.length > 200;
+  const displayText = showFullText
+    ? property.description
+    : property.description?.substring(0, 200) + (isLongText ? "..." : "");
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <HStack>
-        <Text>{property.property_name}</Text>
-      </HStack>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Property Description</Text>
-        <Text style={styles.descriptionText}>{property.description}</Text>
+        <Text style={styles.descriptionText}>{displayText}</Text>
+        {isLongText && (
+          <TouchableOpacity
+            onPress={() => setShowFullText(!showFullText)}
+            style={{
+              justifyContent: "flex-end",
+              alignItems: "flex-end",
+              marginRight: 5,
+            }}
+          >
+            <Text fontSize={14} color={"orange.500"} textAlign={"end"}>
+              {showFullText ? "Show Less" : "Show More"}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
+      <HStack
+        flex={1}
+        flexDirection="column"
+        gap={5}
+        h={100}
+        space={2}
+        mb={12}
+        p={2}
+      >
+        <View flexDirection="row" justifyContent="space-between" mb={1}>
+          <Text fontSize={18} bold color={"blue.700"}>
+            {property.property_name}
+          </Text>
+          <Text fontSize={18} bold color={"blue.700"}>
+            ₹ {formatToIndianCurrency(property.property_cost)}
+          </Text>
+        </View>
+
+        <View flexDirection="row" justifyContent="space-between" mb={1}>
+          <Text fontSize={12} color="gray.400">
+            CONSTRUCTION PVT LTD...
+          </Text>
+          <Text fontSize={12} color="gray.400">
+            All Inclusive Price
+          </Text>
+        </View>
+
+        <View flexDirection="row" justifyContent="space-between" mb={4}>
+          <Text fontSize="md" color="gray.400">
+            {property?.google_address}
+          </Text>
+        </View>
+
+        <View flexDirection="row" justifyContent="space-between" h={10} gap={2}>
+          <Button bgColor="gray.800" borderRadius={30} w={"30%"}>
+            Schedule Visit
+          </Button>
+          <Button bgColor="gray.500" borderRadius={30} w={"30%"}>
+            Contact Seller
+          </Button>
+          <Button bgColor="red.400" borderRadius={30} w={"30%"}>
+            Intrest
+          </Button>
+        </View>
+      </HStack>
       <Image
         source={{ uri: `https://meetowner.in/uploads/${property.image}` }}
         style={styles.propertyImage}
@@ -33,7 +95,7 @@ export default function PropertyDetails() {
             <View style={styles.overviewItem}>
               <Text style={styles.overviewLabel}>Built-up Area</Text>
               <Text style={styles.overviewValue}>
-                {property.builtup_area} {property.area_units}
+                {property.length_area} {"x"} {property.width_area}
               </Text>
             </View>
             <View style={styles.overviewItem}>
@@ -42,24 +104,28 @@ export default function PropertyDetails() {
             </View>
             <View style={styles.overviewItem}>
               <Text style={styles.overviewLabel}>Bedrooms</Text>
-              <Text style={styles.overviewValue}>{property.bedrooms}</Text>
+              <Text style={styles.overviewValue}>{property.bedrooms || 0}</Text>
             </View>
             <View style={styles.overviewItem}>
               <Text style={styles.overviewLabel}>Bathrooms</Text>
-              <Text style={styles.overviewValue}>{property.bathrooms}</Text>
+              <Text style={styles.overviewValue}>
+                {property.bathrooms || 0}
+              </Text>
             </View>
             <View style={styles.overviewItem}>
               <Text style={styles.overviewLabel}>Car Parking</Text>
-              <Text style={styles.overviewValue}>{property.car_parking}</Text>
+              <Text style={styles.overviewValue}>
+                {property.car_parking || 0}
+              </Text>
             </View>
             <View style={styles.overviewItem}>
               <Text style={styles.overviewLabel}>Facing</Text>
-              <Text style={styles.overviewValue}>{property.facing}</Text>
+              <Text style={styles.overviewValue}>{property.facing || 0}</Text>
             </View>
             <View style={styles.overviewItem}>
               <Text style={styles.overviewLabel}>Furnished</Text>
               <Text style={styles.overviewValue}>
-                {property.furnished_status}
+                {property.furnished_status || "No"}
               </Text>
             </View>
           </View>
@@ -70,26 +136,17 @@ export default function PropertyDetails() {
         <Text style={styles.sectionTitle}>Facilities</Text>
         <View style={styles.card}>
           <View style={styles.facilitiesGrid}>
-            {[
-              "✔ Lift",
-              "✔ CCTV",
-              "✔ Gym",
-              "✔ Garden",
-              "✔ Club House",
-              "✔ Sports",
-              "✔ Swimming Pool",
-              "✔ Intercom",
-              "✔ Power Backup",
-              "✔ Gated Community",
-              "✔ Water Supply",
-              "✔ Community Hall",
-              "✔ Pet Friendly",
-              "✔ Security",
-            ].map((facility, index) => (
-              <Text key={index} style={styles.facilityItem}>
-                {facility}
-              </Text>
-            ))}
+            {property?.facilities ? (
+              property.facilities.split(", ").map((facility, index) => (
+                <Text key={index} style={styles.facilityItem}>
+                  ✔ {facility.trim()}
+                </Text>
+              ))
+            ) : (
+              <View flex={1} justifyItems={"center"} alignItems={"center"}>
+                <Text>No details available</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -175,11 +232,11 @@ const styles = StyleSheet.create({
   },
   overviewLabel: {
     fontSize: 14,
+    fontWeight: "bold",
     color: "#666",
   },
   overviewValue: {
     fontSize: 16,
-    fontWeight: "bold",
     color: "#333",
   },
   facilitiesGrid: {
@@ -187,7 +244,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   facilityItem: {
-    width: "48%",
+    width: "50%",
     fontSize: 14,
     marginBottom: 8,
     color: "#333",

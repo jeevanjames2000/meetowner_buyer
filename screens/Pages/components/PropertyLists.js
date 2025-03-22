@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Platform,
   StyleSheet,
+  TextInput,
+  ActivityIndicator,
 } from "react-native";
 import {
   FlatList,
@@ -29,17 +31,21 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import * as Location from "expo-location";
 import { debounce } from "lodash";
-import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import "react-native-get-random-values";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { shallowEqual, useDispatch, useSelector } from "react-redux";
 import { addFavourite } from "../../../store/slices/favourites";
 import { setPropertyDetails } from "../../../store/slices/propertyDetails";
 import { MaterialIcons } from "@expo/vector-icons";
+import config from "../../../config";
+import {
+  setCities,
+  setDeviceLocation,
+} from "../../../store/slices/propertyDetails";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { setCityId } from "../../../store/slices/authSlice";
 import RadioGroup from "react-native-radio-buttons-group";
 const PropertyCard = memo(({ item, onNavigate }) => {
-  console.log("item: ", item.image);
   const area = item.builtup_area
     ? `${item.builtup_area} sqft`
     : `${item.length_area || 0} x ${item.width_area || 0} sqft`;
@@ -49,7 +55,7 @@ const PropertyCard = memo(({ item, onNavigate }) => {
       rounded="lg"
       shadow={3}
       overflow="hidden"
-      mb={3}
+      mb={4}
       borderWidth={1}
       borderColor="gray.200"
       onPress={() => onNavigate(item)}
@@ -60,7 +66,7 @@ const PropertyCard = memo(({ item, onNavigate }) => {
             uri:
               item?.image && item.image.trim() !== ""
                 ? `https://api.meetowner.in/uploads/${item.image}`
-                : "https://via.placeholder.com/160x130?text=No+Image",
+                : `https://placehold.co/600x400@3x.png?text=${item?.property_name}`,
           }}
           alt="Property Image"
           w={160}
@@ -87,16 +93,58 @@ const PropertyCard = memo(({ item, onNavigate }) => {
               space={1}
               alignItems="center"
               borderWidth={0.5}
-              borderColor="green.300"
-              bg="green.100"
+              borderColor={
+                item.property_status === 1
+                  ? "green.300"
+                  : item.property_status === 0
+                  ? "orange.300"
+                  : "blue.300"
+              }
+              bg={
+                item.property_status === 1
+                  ? "green.100"
+                  : item.property_status === 0
+                  ? "#FFF078"
+                  : "blue.100"
+              }
               px={2}
               py={1}
               borderRadius={30}
               justifyContent="center"
             >
-              <Ionicons name="checkmark-circle" size={14} color="green" />
-              <Text fontSize="xs" color="green.600" bold>
-                Verified
+              <Ionicons
+                name={
+                  item.property_status === 1
+                    ? "checkmark-circle"
+                    : item.property_status === 0
+                    ? "time-outline"
+                    : "alert-circle"
+                }
+                size={14}
+                color={
+                  item.property_status === 1
+                    ? "green"
+                    : item.property_status === 0
+                    ? "black"
+                    : "blue"
+                }
+              />
+              <Text
+                fontSize="xs"
+                color={
+                  item.property_status === 1
+                    ? "green.600"
+                    : item.property_status === 0
+                    ? "black"
+                    : "blue.600"
+                }
+                thin
+              >
+                {item.property_status === 1
+                  ? "Verified"
+                  : item.property_status === 0
+                  ? "Pending"
+                  : "In Review"}
               </Text>
             </HStack>
           </HStack>
@@ -120,6 +168,7 @@ const PropertyCard = memo(({ item, onNavigate }) => {
         justifyContent="space-between"
         space={2}
         py={1.5}
+        mb={1.5}
         px={2}
         bg="gray.50"
       >
@@ -171,18 +220,19 @@ const formatToIndianCurrency = (value) => {
 };
 export default function PropertyLists() {
   const dispatch = useDispatch();
+  const flatListRef = useRef(null);
+  const navigation = useNavigation();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
-  const flatListRef = useRef(null);
-  const navigation = useNavigation();
-  const {
-    isOpen: isLocationOpen,
-    onOpen: onOpenLocation,
-    onClose: onCloseLocation,
-  } = useDisclose();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [propertyForOptions, setPropertyForOptions] = useState([]);
+  const [propertyTypeOptions, setPropertyTypeOptions] = useState([]);
+  const [bhkOptions, setBhkOptions] = useState([]);
+  const [possessionOptions, setPossessionOptions] = useState([]);
   const {
     isOpen: isFilterOpen,
     onOpen: onOpenFilter,
@@ -205,13 +255,7 @@ export default function PropertyLists() {
     fetchProperties(true, filters);
     onCloseFilter();
   };
-  const [page, setPage] = useState(1);
-  const [location, setLocation] = useState("");
-  const [limit, setLimit] = useState(10);
-  const [propertyForOptions, setPropertyForOptions] = useState([]);
-  const [propertyTypeOptions, setPropertyTypeOptions] = useState([]);
-  const [bhkOptions, setBhkOptions] = useState([]);
-  const [possessionOptions, setPossessionOptions] = useState([]);
+
   const clearAllFilters = () => {
     setFilters({
       property_for: "Sell",
@@ -283,6 +327,7 @@ export default function PropertyLists() {
   const fetchProperties = useCallback(
     async (reset = false, appliedFilters = filters) => {
       const storedDetails = await AsyncStorage.getItem("userdetails");
+      console.log("storedDetails: ", storedDetails);
       if (!storedDetails) {
         return;
       }
@@ -290,9 +335,12 @@ export default function PropertyLists() {
       setUserDetails(parsedUserDetails);
       try {
         const cityId = await AsyncStorage.getItem("city_id");
+        console.log("cityId: ", cityId);
+        const data1 = JSON.parse(cityId);
+        console.log("data1: ", data1);
         const response = await fetch(
-          `https://api.meetowner.in/listings/getallpropertiesnew?searched_location=${location}&searched_city=${
-            cityId ? parseInt(cityId, 10) : ""
+          `https://api.meetowner.in/listings/getallpropertiesnew?searched_location=Hyderabad&searched_city=${
+            data1 ? parseInt(data1.value, 10) : ""
           }&searched_property_for=${
             appliedFilters.property_for
           }&searched_property_sub=${
@@ -306,6 +354,7 @@ export default function PropertyLists() {
           }&limit=${limit}`
         );
         const data = await response.json();
+        console.log("data: ", data.propertiesData[0]);
         if (data.propertiesData && data.propertiesData.length > 0) {
           setProperties((prev) =>
             reset ? data.propertiesData : [...prev, ...data.propertiesData]
@@ -324,8 +373,113 @@ export default function PropertyLists() {
         if (reset) setRefreshing(false);
       }
     },
-    [filters, location, page, limit]
+    [filters, page, limit]
   );
+
+  const [locations, setLocations] = useState([]);
+  const [filteredLocations, setFilteredLocations] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState([]);
+  const { isOpen, onOpen, onClose } = useDisclose();
+  const cities = useSelector((state) => state.property.cities, shallowEqual);
+  const [suggestions, setSuggestions] = useState([]);
+  console.log("suggestions: ", suggestions);
+  const fetchSuggestions = async (city_id, query) => {
+    console.log("city_id, query: ", city_id, query);
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${config.awsApiUrl}/general/getlocalitiesbycitynamenew?city_id=${city_id}&input=${query}`
+      );
+      const data = await response.json();
+      console.log("data: ", data);
+      if (data?.status === "success") {
+        setSuggestions((data?.places).slice(0, 10) || []);
+      } else {
+        setSuggestions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching autocomplete suggestions:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const response = await fetch(
+          "https://api.meetowner.in/general/getcities"
+        );
+        const data = await response.json();
+        dispatch(setCities(data.cities || []));
+        if (userLocation) {
+          const matchedCity = data.cities.find(
+            (city) => city.label.toLowerCase() === userLocation.toLowerCase()
+          );
+          if (matchedCity) {
+            const data = {
+              label: matchedCity.label,
+              value: matchedCity.value,
+            };
+            AsyncStorage.setItem("city_id", JSON.stringify(data));
+            dispatch(setCityId(data));
+          } else {
+            console.log("City not found in list");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching cities:", error);
+      }
+    };
+    fetchCities();
+    getUserLocation();
+  }, [dispatch, userLocation]);
+  const [userLocation, setUserLocation] = useState("");
+  const getUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Location access is required.");
+        dispatch(setUserLocation("Unknown City"));
+        return;
+      }
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+      });
+      const { latitude, longitude } = location.coords;
+      const geocode = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+      if (geocode.length > 0) {
+        const city = geocode[0]?.city || "Unknown City";
+        setUserLocation(city);
+        dispatch(setDeviceLocation(city));
+      }
+    } catch (error) {
+      console.error("Error fetching user location:", error);
+      Alert.alert("Error", "Failed to get your location.");
+      dispatch(setUserLocation("Unknown City"));
+    }
+  };
+  useEffect(() => {
+    setLocations(cities);
+    setFilteredLocations(cities);
+    if (userLocation && cities.length > 0) {
+      const matchedCity = cities.find(
+        (city) => city.label.toLowerCase() === userLocation.toLowerCase()
+      );
+      if (matchedCity) {
+        setSelectedLocation({
+          label: matchedCity.label,
+          value: matchedCity.value,
+        });
+      } else {
+        console.log("City not found in the list");
+        setSelectedLocation(null);
+      }
+    }
+  }, [cities, userLocation]);
   useEffect(() => {
     fetchProperties(true, filters);
   }, [filters]);
@@ -376,28 +530,14 @@ export default function PropertyLists() {
     setPage(1);
     fetchProperties(true);
   };
-  const windowHeight = Dimensions.get("window").height;
-  const itemHeight = 180 + 60 + 40;
-  const windowSize = Math.ceil(windowHeight / itemHeight) * 2;
-  const [locations, setLocations] = useState([]);
-  const [filteredLocations, setFilteredLocations] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState("");
-  const cities = useSelector((state) => state.property.cities, shallowEqual);
-  const deviceLocation = useSelector(
-    (state) => state.property.deviceLocation,
-    shallowEqual
-  );
-  useEffect(() => {
-    setLocations(cities);
-    setFilteredLocations(cities);
-    setSelectedLocation(deviceLocation);
-  }, [cities, deviceLocation]);
-  const showLocationActionSheet = () => {
-    onOpenLocation();
-  };
+
   const showFilterActionSheet = () => {
     onOpenFilter();
+  };
+  const loadMoreProperties = () => {
+    if (hasMore && !loading) {
+      setLimit((prevLimit) => prevLimit + 10);
+    }
   };
   const handleSearch = debounce((query) => {
     setSearchQuery(query);
@@ -410,77 +550,85 @@ export default function PropertyLists() {
       setFilteredLocations(filtered);
     }
   }, 300);
-  const loadMoreProperties = () => {
-    if (hasMore && !loading) {
-      setLimit((prevLimit) => prevLimit + 10);
+  const handleLocationSearch = (query) => {
+    console.log("Searching locations for query: ", query);
+    setSearchQuery(query);
+    if (query.trim() === "") {
+      setSuggestions([]);
+      return;
+    }
+    if (selectedLocation?.value) {
+      fetchSuggestions(selectedLocation.value, query);
+    } else {
+      console.log("No city selected. Cannot fetch suggestions.");
+      setSuggestions([]);
     }
   };
-
+  const handleCitySelect = (item) => {
+    console.log("item: ", item);
+    setSelectedLocation(item);
+    onClose();
+  };
   return (
-    <View flex={1} px={2} bg={"#fff"}>
-      <HStack py={2} mx={1} alignItems={"center"} justifyContent={"center"}>
-        <GooglePlacesAutocomplete
-          placeholder="Search location"
-          onPress={(data, details = null) => {
-            if (details && details.geometry) {
-              const location = details.formatted_address || data.description;
-              setSelectedLocation(location);
-              setSearchQuery(location);
-            } else {
-              setSelectedLocation(data.description);
-              setSearchQuery(data.description);
-            }
-          }}
-          query={{
-            key: "AIzaSyBaj73FwouBoJro-Zxl2M0c0R14bnHdtFc",
-            language: "en",
-          }}
-          fetchDetails={true}
-          textInputProps={{
-            value: searchQuery,
-            onChangeText: (text) => {
-              setSearchQuery(text);
-              if (text === "") {
-                setSelectedLocation("");
-              }
-            },
-          }}
-          styles={{
-            container: {
-              width: "100%",
-              borderColor: "#000",
-              borderWidth: 0.5,
-              borderRadius: 30,
-            },
-            textInputContainer: styles.textInputContainer,
-            textInput: styles.textInput,
-            listView: {
-              backgroundColor: "white",
-              borderRadius: 10,
-              marginTop: 5,
-            },
-          }}
-          renderLeftButton={() => (
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={showLocationActionSheet}
-            >
-              <HStack space={2}>
-                <Ionicons name="location-outline" size={20} color="gray" />
-                <Text fontSize={12}>
-                  {selectedLocation ? selectedLocation : "City"}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="gray" />
-              </HStack>
-            </TouchableOpacity>
-          )}
-          renderRightButton={() => (
-            <TouchableOpacity style={styles.iconButton}>
-              <Ionicons name="search" size={20} color="gray" />
-            </TouchableOpacity>
-          )}
-        />
-      </HStack>
+    <View style={styles.container}>
+      <View style={styles.searchContainer}>
+        <TouchableOpacity style={styles.cityButton} onPress={onOpen}>
+          <HStack space={1} alignItems="center">
+            <Ionicons name="location-outline" size={20} color="gray" />
+            <Text style={styles.cityText}>
+              {selectedLocation?.label || selectedLocation || "Select City"}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="gray" />
+          </HStack>
+        </TouchableOpacity>
+        <View style={{ flex: 1, position: "relative" }}>
+          <TextInput
+            placeholder="Search location"
+            value={searchQuery}
+            onChangeText={(text) => {
+              handleLocationSearch(text);
+            }}
+            style={styles.textInput}
+          />
+        </View>
+        <TouchableOpacity style={styles.iconButton}>
+          <Ionicons name="search" size={20} color="gray" />
+        </TouchableOpacity>
+      </View>
+      <View
+        style={{
+          justifyContent: "center",
+          alignItems: "center",
+          flex: 1,
+          width: "90%",
+          alignSelf: "center",
+          zIndex: 1,
+        }}
+      >
+        {loading ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="small" color="#999" />
+          </View>
+        ) : suggestions.length > 0 ? (
+          <FlatList
+            data={suggestions}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.suggestionItem}
+                onPress={() => {
+                  setSearchQuery(item?.value || item?.label);
+                  setSuggestions([]);
+                }}
+              >
+                <Text style={styles.suggestionText}>{item?.label}</Text>
+              </TouchableOpacity>
+            )}
+            style={styles.suggestionsList}
+          />
+        ) : null}
+      </View>
+
       <HStack
         py={2}
         mx={2}
@@ -537,14 +685,16 @@ export default function PropertyLists() {
           onPress={scrollToTop}
         />
       )}
-      <Actionsheet isOpen={isLocationOpen} onClose={onCloseLocation}>
+
+      <Actionsheet isOpen={isOpen} onClose={onClose}>
         <Actionsheet.Content
-          justifyContent={"center"}
-          alignItems={"left"}
+          justifyContent={"flex-start"}
+          alignItems={"flex-start"}
           maxHeight={500}
+          width={"100%"}
         >
           <Input
-            placeholder="Search location"
+            placeholder="Search city"
             value={searchQuery}
             onChangeText={handleSearch}
             width="100%"
@@ -567,11 +717,7 @@ export default function PropertyLists() {
             keyExtractor={(item, index) => `${item.label}-${index}`}
             renderItem={({ item }) => (
               <TouchableOpacity
-                onPress={() => {
-                  setSelectedLocation(item.label);
-                  setSearchQuery(item.label);
-                  onCloseLocation();
-                }}
+                onPress={(item) => handleCitySelect(item)}
                 style={styles.fullWidthItem}
               >
                 <Text style={styles.fullWidthText}>{item.label}</Text>
@@ -582,8 +728,8 @@ export default function PropertyLists() {
                 No locations found
               </Text>
             }
-            contentContainerStyle={styles.flatListContainer}
-            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ width: "100%" }}
+            style={{ width: "100%" }}
           />
         </Actionsheet.Content>
       </Actionsheet>
@@ -668,7 +814,7 @@ export default function PropertyLists() {
               </Box>
               <Pressable
                 onPress={clearAllFilters}
-                bg="#FF4D4D"
+                bg="#FF6969"
                 py={2}
                 rounded="lg"
                 alignItems="center"
@@ -697,6 +843,10 @@ export default function PropertyLists() {
   );
 }
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
   headerContainer: {
     paddingBottom: 10,
     paddingTop: Platform.OS === "ios" ? 50 : 40,
@@ -705,11 +855,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
   },
-  iconButton: {
-    padding: 8,
-    marginTop: 10,
-    marginRight: 6,
-  },
+
   title: {
     fontSize: 18,
     fontWeight: "bold",
@@ -717,41 +863,92 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     width: "100%",
-    marginTop: 10,
-    borderWidth: 1,
+    marginTop: 5,
+    marginBottom: 5,
+    borderWidth: 0.5,
     borderRadius: 30,
-    borderColor: "#000",
-  },
-  textInputContainer: {
+    borderColor: "#ddd",
     backgroundColor: "white",
-    borderRadius: 30,
-    paddingLeft: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  cityButton: {
+    paddingHorizontal: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    height: 50,
+    borderTopLeftRadius: 30,
+    borderBottomLeftRadius: 30,
+    backgroundColor: "#f9f9f9",
+  },
+  cityText: {
+    fontSize: 14,
+    color: "#333",
   },
   textInput: {
     height: 50,
     fontSize: 14,
-    color: "gray.700",
+    color: "#333",
+    flex: 1,
     backgroundColor: "white",
+    paddingHorizontal: 10,
     borderRadius: 30,
   },
-  searchIconButton: {
-    paddingHorizontal: 10,
+  iconButton: {
+    paddingHorizontal: 12,
     justifyContent: "center",
     alignItems: "center",
+    height: 50,
+    borderTopRightRadius: 30,
+    borderBottomRightRadius: 30,
+    backgroundColor: "#f9f9f9",
   },
   fullWidthItem: {
-    width: "100%",
+    flex: 1,
+    width: "10%",
     justifyContent: "flex-start",
     alignItems: "flex-start",
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
+
   fullWidthText: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#333",
   },
-  flatListContainer: {
+  loaderContainer: {
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  suggestionsList: {
+    maxHeight: 150,
     width: "100%",
-    paddingBottom: 20,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    position: "absolute",
+    top: 0,
+    zIndex: 999,
+  },
+
+  suggestionItem: {
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  suggestionText: {
+    fontSize: 16,
+    color: "#333",
   },
 });

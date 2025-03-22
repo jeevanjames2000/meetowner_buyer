@@ -18,36 +18,54 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+
 const faqsData = [
   {
     id: 1,
-    question: "Is there a free trial available?",
-    answer: "Yes, you can try us for free for 30 days.",
+    question: "How secure is my data with MeetOwner ?",
+    answer:
+      "meetowner.in prioritizes data security with encryption protocols and strict privacy policies.",
   },
   {
     id: 2,
-    question: "Can I change my plan later?",
-    answer: "Yes, you can upgrade or downgrade anytime.",
+    question: "How are builder and channel partner accounts verified ?",
+    answer:
+      "Builders and channel partners must provide valid business registration details, RERA (if applicable), and identity verification before account approval.",
   },
   {
     id: 3,
-    question: "What is your cancellation policy?",
-    answer: "Cancel anytime with no fees.",
+    question: "How does MeetOwner verify properties ?",
+    answer:
+      "MeetOwner conducts basic verification, including checking property documents uploaded by owners.",
   },
   {
     id: 4,
-    question: "How does billing work?",
-    answer: "Monthly or annually, based on your plan.",
+    question: "How long does it take for project approval on MeetOwner?",
+    answer:
+      "Project approval typically takes 24 to 48 hours after submission. ",
   },
   {
     id: 5,
-    question: "How do I change my account email?",
-    answer: "Update it in account settings.",
+    question: "Account & Login Issues", // Parent question
+    children: [
+      {
+        id: 1,
+        question: "What should I do if I face login issues?",
+        answer: `Ensure you are using the correct Phone Number linked to your account. \n If you are a Builder or Channel Partner, you will receive a 6-digit OTP for login.\n If you are a User or Buyer, you will receive a 4-digit OTP for login.`,
+      },
+      {
+        id: 2,
+        question: "How can I reach MeetOwner for login or account issues?",
+        answer:
+          "Email: support@meetowner.in\nPhone: +91-9701888071\nLive Chat: Available on the website for instant support.",
+      },
+    ],
   },
 ];
 export default function Support() {
   const navigation = useNavigation();
   const [expanded, setExpanded] = useState(null);
+  const [childExpanded, setChildExpanded] = useState(null); // For child FAQs
   const [userInfo, setUserInfo] = useState("");
   const [formData, setFormData] = useState({
     name: userInfo?.name || "",
@@ -59,12 +77,22 @@ export default function Support() {
   const [isLoadingEffect, setIsLoadingEffect] = useState(false);
   const scrollViewRef = useRef();
   const handleRouteBack = () => navigation.goBack();
+
   const toggleFAQ = (id) => {
     setExpanded(expanded === id ? null : id);
+    if (expanded !== id) {
+      setChildExpanded(null);
+    }
   };
+
+  const toggleChildFAQ = (childId) => {
+    setChildExpanded(childExpanded === childId ? null : childId);
+  };
+
   const handleChange = (name, value) => {
     setFormData({ ...formData, [name]: value });
   };
+
   const validateForm = () => {
     let valid = true;
     const newErrors = {};
@@ -90,6 +118,7 @@ export default function Support() {
     setErrors(newErrors);
     return valid;
   };
+
   const handleSubmit = () => {
     Keyboard.dismiss();
     if (!validateForm()) {
@@ -134,6 +163,7 @@ export default function Support() {
         Alert.alert("Error", "An error occurred");
       });
   };
+
   useEffect(() => {
     const getData = async () => {
       const data = await AsyncStorage.getItem("userdetails");
@@ -151,6 +181,7 @@ export default function Support() {
       keyboardDidShowListener.remove();
     };
   }, []);
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea}>
@@ -171,7 +202,7 @@ export default function Support() {
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
               <VStack p={4} mt={1} space={4}>
                 <Text fontSize="2xl" fontWeight="bold" textAlign="center">
-                  Frequently asked questions
+                  Frequently Asked Questions
                 </Text>
                 {faqsData.map((faq) => (
                   <Box
@@ -182,26 +213,97 @@ export default function Support() {
                     borderWidth={1}
                     borderColor="gray.200"
                   >
-                    <Pressable onPress={() => toggleFAQ(faq.id)}>
-                      <HStack
-                        justifyContent="space-between"
-                        alignItems="center"
-                      >
-                        <Text fontWeight="bold">{faq.question}</Text>
-                        <Icon
-                          as={Ionicons}
-                          name={
-                            expanded === faq.id ? "chevron-up" : "chevron-down"
-                          }
-                          size={5}
-                          color="gray.500"
-                        />
-                      </HStack>
-                    </Pressable>
-                    {expanded === faq.id && (
-                      <Text mt={2} color="gray.600">
-                        {faq.answer}
-                      </Text>
+                    {/* Parent FAQ */}
+                    {faq.children ? (
+                      <>
+                        <Pressable onPress={() => toggleFAQ(faq.id)}>
+                          <HStack
+                            justifyContent="space-between"
+                            alignItems="center"
+                          >
+                            <Text fontWeight="bold">{faq.question}</Text>
+                            <Icon
+                              as={Ionicons}
+                              name={
+                                expanded === faq.id
+                                  ? "chevron-up"
+                                  : "chevron-down"
+                              }
+                              size={5}
+                              color="gray.500"
+                            />
+                          </HStack>
+                        </Pressable>
+                        {/* Child FAQs */}
+                        {expanded === faq.id && (
+                          <VStack mt={2} space={2}>
+                            {faq.children.map((child) => (
+                              <Box
+                                key={child.id}
+                                bg="gray.50"
+                                p={2}
+                                rounded="md"
+                                borderWidth={1}
+                                borderColor="gray.200"
+                              >
+                                <Pressable
+                                  onPress={() => toggleChildFAQ(child.id)}
+                                >
+                                  <HStack
+                                    justifyContent="space-between"
+                                    alignItems="center"
+                                  >
+                                    <Text fontWeight="medium">
+                                      {child.question}
+                                    </Text>
+                                    <Icon
+                                      as={Ionicons}
+                                      name={
+                                        childExpanded === child.id
+                                          ? "chevron-up"
+                                          : "chevron-down"
+                                      }
+                                      size={4}
+                                      color="gray.500"
+                                    />
+                                  </HStack>
+                                </Pressable>
+                                {childExpanded === child.id && (
+                                  <Text mt={2} color="gray.600">
+                                    {child.answer}
+                                  </Text>
+                                )}
+                              </Box>
+                            ))}
+                          </VStack>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Pressable onPress={() => toggleFAQ(faq.id)}>
+                          <HStack
+                            justifyContent="space-between"
+                            alignItems="center"
+                          >
+                            <Text fontWeight="bold">{faq.question}</Text>
+                            <Icon
+                              as={Ionicons}
+                              name={
+                                expanded === faq.id
+                                  ? "chevron-up"
+                                  : "chevron-down"
+                              }
+                              size={5}
+                              color="gray.500"
+                            />
+                          </HStack>
+                        </Pressable>
+                        {expanded === faq.id && (
+                          <Text mt={2} color="gray.600">
+                            {faq.answer}
+                          </Text>
+                        )}
+                      </>
                     )}
                   </Box>
                 ))}
@@ -272,7 +374,6 @@ export default function Support() {
                     onPress={handleSubmit}
                   >
                     <Text style={styles.submitBtnText}>
-                      {" "}
                       {isLoadingEffect ? "Submitting..." : "Submit"}
                     </Text>
                   </TouchableOpacity>

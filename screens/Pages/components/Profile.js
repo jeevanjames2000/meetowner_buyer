@@ -16,7 +16,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { HStack, Toast } from "native-base";
 import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import axios from "axios";
 import config from "../../../config";
 export default function Profile() {
@@ -344,7 +343,7 @@ export default function Profile() {
           style={styles.gobackbutton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.logoutText}>Go Back</Text>
+          <Text style={styles.goBackText}>Go Back</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
@@ -476,8 +475,8 @@ const styles = StyleSheet.create({
   },
   editIcon: {
     position: "absolute",
-    bottom: 5,
-    right: 5,
+    bottom: 20,
+    right: -2,
     backgroundColor: "#4F46E5",
     borderRadius: 20,
     padding: 5,
@@ -494,7 +493,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   editProfileBtn: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: "#1D3A76",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -520,20 +519,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   gobackbutton: {
-    backgroundColor: "gray",
+    backgroundColor: "#fff",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    width: "45%",
+    alignItems: "center",
+    borderColor: "#B7B6B6",
+    borderWidth: 1,
+  },
+  logoutBtn: {
+    backgroundColor: "#1D3A76",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
     width: "45%",
     alignItems: "center",
   },
-  logoutBtn: {
-    backgroundColor: "#EF4444",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    width: "45%",
-    alignItems: "center",
+  goBackText: {
+    color: "black",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   logoutText: {
     color: "#fff",
@@ -547,16 +553,19 @@ const styles = StyleSheet.create({
   accordionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: "#E5E7EB",
+    backgroundColor: "#fff",
     paddingVertical: 12,
     paddingHorizontal: 15,
     borderRadius: 8,
     marginTop: 10,
+    borderColor: "#EDF2FF",
+    borderWidth: 3,
+    elevation: 1,
   },
   accordionTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#4F46E5",
+    color: "black",
   },
   accordionContent: {
     backgroundColor: "#F9FAFB",
@@ -566,7 +575,8 @@ const styles = StyleSheet.create({
   },
   accordionText: {
     fontSize: 14,
-    color: "#6B7280",
+    color: "black",
+    fontWeight: "400",
   },
   modalContainer: {
     flex: 1,
@@ -605,7 +615,7 @@ const styles = StyleSheet.create({
   closeBtn: {
     width: "50%",
     borderWidth: 0.5,
-    borderColor: "red",
+    borderColor: "#B7B6B6",
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -613,7 +623,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   closeText: {
-    color: "red",
+    color: "black",
     fontWeight: "bold",
   },
   saveBtn: {
@@ -623,11 +633,11 @@ const styles = StyleSheet.create({
     borderColor: "green",
     paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#1D3A76",
     alignItems: "center",
   },
   saveText: {
-    color: "green",
+    color: "white",
     fontWeight: "bold",
   },
 });

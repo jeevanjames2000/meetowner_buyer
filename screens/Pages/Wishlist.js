@@ -31,162 +31,191 @@ import config from "../../config";
 export default function Wishlist() {
   const navigation = useNavigation();
   const dispatch = useDispatch();
-  // const favourites = useSelector((state) => state.favourites.favourites);
-  // console.log("favourites: ", favourites);
   const [state, setState] = useState([]);
-  console.log("state: ", state);
   const { isOpen, onOpen, onClose } = useDisclose();
-  const removeItem = useCallback(
-    (id) => {
-      dispatch(removeFavourite(id));
-    },
-    [dispatch]
-  );
+  const removeItem = useCallback((id) => {
+    console.log("id: ", id);
+    handleInterestAPI(id, 1);
+    dispatch(removeFavourite(id));
+  }, []);
   const formatToIndianCurrency = (value) => {
     if (value >= 10000000) return (value / 10000000).toFixed(2) + " Cr";
     if (value >= 100000) return (value / 100000).toFixed(2) + " L";
     if (value >= 1000) return (value / 1000).toFixed(2) + " K";
     return value?.toString();
   };
-  const renderPropertyCard = ({ item }) => (
-    <Pressable
-      bg="white"
-      rounded="lg"
-      shadow={3}
-      overflow="hidden"
-      mb={3}
-      borderWidth={1}
-      borderColor="gray.200"
-    >
-      <View position="relative">
-        <Image
-          source={{
-            uri: `https://api.meetowner.in/uploads/${item?.property_details?.image}`,
-            cache: "force-cache",
-          }}
-          alt="Property Image"
-          w="100%"
-          h={180}
-          resizeMode="cover"
-        />
-        <View
-          position="absolute"
-          top={2}
-          left={2}
-          bg="white:alpha.80"
-          px={3}
-          py={1}
-          rounded="md"
-          opacity={0.75}
-        >
-          <Text color="black" fontSize="xs" bold>
-            {item?.property_details?.property_for}
-          </Text>
-        </View>
-        <HStack position="absolute" top={2} right={2} space={2}>
-          <Pressable
-            p={2}
-            bg="white"
-            rounded="full"
-            onPress={() => removeItem(item?.property_details?.id)}
-          >
-            <Ionicons name="heart" size={20} color="red" />
-          </Pressable>
-          <Pressable
-            p={2}
-            bg="white"
-            rounded="full"
-            onPress={() => console.log("Share pressed!")}
-          >
-            <Ionicons name="share-social-outline" size={20} color="black" />
-          </Pressable>
-        </HStack>
-        <View
-          position="absolute"
-          bottom={2}
-          left={2}
-          right={2}
-          flexDirection="row"
-          justifyContent="left"
-          gap={3}
-        >
-          {item?.property_details?.bedrooms && (
-            <HStack
-              bg="white:alpha.80"
-              px={2}
-              py={1}
-              rounded="lg"
-              alignItems="center"
-            >
-              <Text color="black" fontSize="xs">
-                {item?.property_details?.bedrooms} BHK
-              </Text>
-            </HStack>
-          )}
-          {item.bathrooms && (
-            <HStack
-              bg="white:alpha.80"
-              px={2}
-              py={1}
-              rounded="lg"
-              alignItems="center"
-            >
-              <Text color="black" fontSize="xs">
-                {item?.property_details?.bathrooms} Bath
-              </Text>
-            </HStack>
-          )}
-          {item.car_parking && (
-            <HStack
-              bg="white:alpha.80"
-              px={2}
-              py={1}
-              rounded="lg"
-              alignItems="center"
-            >
-              <Text color="black" fontSize="xs">
-                {item?.property_details?.car_parking} Parking
-              </Text>
-            </HStack>
-          )}
-        </View>
-      </View>
-      <HStack justifyContent="space-between" px={3} py={1}>
-        <View flex={1}>
-          <Text fontSize="sm" bold color="gray.500" numberOfLines={1}>
-            {item?.property_details?.property_name}
-          </Text>
-        </View>
-        <View>
-          <Text fontSize="sm" bold color="gray.800">
-            ₹ {formatToIndianCurrency(item?.property_details?.property_cost)}
-          </Text>
-        </View>
-      </HStack>
-      <HStack justifyContent="space-between" px={3} py={1}>
-        <View flex={1}>
-          <Text fontSize="xs" bold color="gray.500" numberOfLines={1}>
-            {item?.property_details?.google_address}
-          </Text>
-        </View>
-      </HStack>
-      <Pressable
-        bg="#1D3A76"
-        py={2}
-        alignItems="center"
-        borderRadius={10}
-        width="95%"
-        alignSelf="center"
-        my={1}
-        onPress={() => console.log("Navigate to details")}
-      >
-        <Text color="white" bold>
-          Enquire Now
-        </Text>
-      </Pressable>
-    </Pressable>
-  );
+  const shareItem = (id) => {
+    console.log("Share item with ID:", id);
+  };
+  const [enquiredItems, setEnquiredItems] = useState({});
 
+  const handleEnquiry = (id) => {
+    setEnquiredItems((prev) => ({
+      ...prev,
+      [id]: true,
+    }));
+  };
+  const PropertyCard = ({ item, onRemove, onShare, onEnquire, enquired }) => {
+    return (
+      <Pressable
+        bg="white"
+        rounded="lg"
+        shadow={3}
+        overflow="hidden"
+        mb={3}
+        borderWidth={1}
+        borderColor="gray.200"
+      >
+        <View position="relative">
+          <Image
+            source={{
+              uri: `https://api.meetowner.in/uploads/${item?.property_details?.image}`,
+              cache: "force-cache",
+            }}
+            alt="Property Image"
+            w="100%"
+            h={180}
+            resizeMode="cover"
+          />
+
+          <View
+            position="absolute"
+            top={2}
+            left={2}
+            bg="white:alpha.80"
+            px={3}
+            py={1}
+            rounded="md"
+            opacity={0.75}
+          >
+            <Text color="black" fontSize="xs" bold>
+              {item?.property_details?.property_for}
+            </Text>
+          </View>
+
+          <HStack position="absolute" top={2} right={2} space={2}>
+            <Pressable
+              p={2}
+              bg="white"
+              rounded="full"
+              onPress={() =>
+                onRemove(item?.property_details.unique_property_id, 1)
+              }
+            >
+              <Ionicons name="heart" size={20} color="red" />
+            </Pressable>
+            <Pressable
+              p={2}
+              bg="white"
+              rounded="full"
+              onPress={() => onShare(item?.id)}
+            >
+              <Ionicons name="share-social-outline" size={20} color="black" />
+            </Pressable>
+          </HStack>
+
+          <View
+            position="absolute"
+            bottom={2}
+            left={2}
+            right={2}
+            flexDirection="row"
+            justifyContent="left"
+            gap={3}
+          >
+            {item?.property_details?.bedrooms && (
+              <HStack
+                bg="white:alpha.80"
+                px={2}
+                py={1}
+                rounded="lg"
+                alignItems="center"
+              >
+                <Text color="black" fontSize="xs">
+                  {item?.property_details?.bedrooms} BHK
+                </Text>
+              </HStack>
+            )}
+            {item?.property_details?.bathrooms && (
+              <HStack
+                bg="white:alpha.80"
+                px={2}
+                py={1}
+                rounded="lg"
+                alignItems="center"
+              >
+                <Text color="black" fontSize="xs">
+                  {item?.property_details?.bathrooms} Bath
+                </Text>
+              </HStack>
+            )}
+            {item?.property_details?.car_parking && (
+              <HStack
+                bg="white:alpha.80"
+                px={2}
+                py={1}
+                rounded="lg"
+                alignItems="center"
+              >
+                <Text color="black" fontSize="xs">
+                  {item?.property_details?.car_parking} Parking
+                </Text>
+              </HStack>
+            )}
+          </View>
+        </View>
+
+        <HStack justifyContent="space-between" px={3} py={1}>
+          <View flex={1}>
+            <Text fontSize="sm" bold color="gray.500" numberOfLines={1}>
+              {item?.property_details?.property_name}
+            </Text>
+          </View>
+          <View>
+            <Text fontSize="sm" bold color="gray.800">
+              ₹ {formatToIndianCurrency(item?.property_details?.property_cost)}
+            </Text>
+          </View>
+        </HStack>
+
+        <HStack justifyContent="space-between" px={3} py={1}>
+          <View flex={1}>
+            <Text fontSize="xs" bold color="gray.500" numberOfLines={1}>
+              {item?.property_details?.google_address}
+            </Text>
+          </View>
+        </HStack>
+
+        <Pressable
+          bg="#1D3A76"
+          py={2}
+          alignItems="center"
+          borderRadius={10}
+          width="95%"
+          alignSelf="center"
+          my={1}
+          onPress={() => onEnquire(item?.id)}
+        >
+          <Text color="white" bold>
+            {enquired ? "Our executive will contact you soon!" : "Enquire Now"}
+          </Text>
+        </Pressable>
+      </Pressable>
+    );
+  };
+
+  const handleInterestAPI = async (id, action) => {
+    console.log("called", id, action, userInfo.user_id);
+    try {
+      await fetch(
+        `${config.mainapi_url}/favourites_exe?user_id=${userInfo.user_id}&unique_property_id=${id}&intrst=1&action=${action}`
+      );
+      console.log("loading api");
+      fetchPropertyList(userInfo.user_id, "interested_property_fetch");
+    } catch (error) {
+      console.log("error: ", error);
+    }
+  };
   async function fetchPropertyList(user_id, filterType) {
     let url = `${config.mainapi_url}/Api/newapi?fetchtype=${filterType}&user_id=347`;
     try {
@@ -196,8 +225,7 @@ export default function Wishlist() {
       });
       const udata = await response.json();
       const { data } = udata;
-
-      console.log("response: ", response);
+      console.log("response: ", data);
       if (response.ok) {
         setState(data);
       }
@@ -210,13 +238,13 @@ export default function Wishlist() {
   const [userInfo, setUserInfo] = useState("");
   console.log("userInfo: ", userInfo);
   useEffect(() => {
+    fetchPropertyList(userInfo.user_id, "interested_property_fetch");
     const getData = async () => {
       const data = await AsyncStorage.getItem("userdetails");
       const parsedUserDetails = JSON.parse(data);
       setUserInfo(parsedUserDetails);
     };
     getData();
-    fetchPropertyList(userInfo.user_id, "interested_property_fetch");
   }, []);
   return (
     <SafeAreaProvider>
@@ -263,9 +291,21 @@ export default function Wishlist() {
           ) : (
             <FlatList
               data={state}
-              renderItem={renderPropertyCard}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.flatListContainer}
+              renderItem={({ item }) => (
+                <View px={3} py={2}>
+                  <PropertyCard
+                    item={item}
+                    onRemove={removeItem}
+                    onShare={shareItem}
+                    onEnquire={handleEnquiry}
+                    enquired={enquiredItems[item?.id]}
+                  />
+                </View>
+              )}
+              keyExtractor={(item) => item?.id?.toString()}
+              contentContainerStyle={{
+                paddingBottom: 100,
+              }}
             />
           )}
           <Actionsheet isOpen={isOpen} onClose={onClose}>

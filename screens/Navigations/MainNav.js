@@ -71,6 +71,7 @@ export default function MainNav() {
                 <CustomHeader
                   navigation={navigation}
                   title="Property Details"
+                  route="Wishlist"
                 />
               ),
             })}
@@ -80,7 +81,11 @@ export default function MainNav() {
             component={Wishlist}
             options={({ navigation }) => ({
               header: () => (
-                <CustomHeader navigation={navigation} title="Wishlist" />
+                <CustomHeader
+                  navigation={navigation}
+                  title="Wishlist"
+                  route="Wishlist"
+                />
               ),
             })}
           />
@@ -109,15 +114,12 @@ export default function MainNav() {
 }
 const styles = StyleSheet.create({
   header: {
+    paddingBottom: 10,
     paddingTop: Platform.OS === "ios" ? 50 : 20,
-    height: 56,
+    paddingHorizontal: 18,
     backgroundColor: "#fff",
-    paddingHorizontal: 16,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
   },
   iconButton: {
     padding: 8,
