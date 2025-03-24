@@ -4,29 +4,45 @@ import React, { useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { jwtDecode } from "jwt-decode";
 import { useNavigation } from "@react-navigation/native";
+
 export default function SplashScreen() {
   const navigation = useNavigation();
+
   useEffect(() => {
-    // AsyncStorage.removeItem("userdetails");
-    // AsyncStorage.removeItem("usermobile");
-    // AsyncStorage.removeItem("token");
     const checkToken = async () => {
       try {
         const token = await AsyncStorage.getItem("token");
+        const data = await AsyncStorage.getItem("userdetails");
+        const parsedUserDetails = data ? JSON.parse(data) : null;
+
         let routeName = "Login";
+
         if (token) {
           const decoded = jwtDecode(token);
           const currentTime = Math.floor(Date.now() / 1000);
-          if (decoded.exp && decoded.exp > currentTime) {
+
+          // If user details are missing, clear all data
+          if (!parsedUserDetails) {
+            await AsyncStorage.clear(); // Clear all keys
+            routeName = "Login";
+          }
+          // Check if token is valid and not expired
+          else if (decoded.exp && decoded.exp > currentTime) {
             routeName = "dashboard";
           } else {
-            await AsyncStorage.removeItem("token");
+            // Token expired, clear AsyncStorage and show a toast
+            await AsyncStorage.clear(); // Clear all data
             Toast.show({
               title: "Session expired. Please login again.",
               duration: 3000,
             });
           }
+        } else {
+          // No token found, navigate to Login
+          routeName = "Login";
         }
+
+        // Navigate after a short delay
         setTimeout(() => {
           navigation.replace(routeName);
         }, 3500);
@@ -37,8 +53,10 @@ export default function SplashScreen() {
         }, 3500);
       }
     };
+
     checkToken();
   }, []);
+
   return (
     <View style={styles.container}>
       <Image
@@ -51,6 +69,7 @@ export default function SplashScreen() {
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -10,6 +10,8 @@ const propertySlice = createSlice({
     cities: [],
     deviceLocation: "",
     intrested: [],
+    trendingProjects: [],
+    intrestedProperties: [],
   },
   reducers: {
     setPropertyDetails: (state, action) => {
@@ -33,6 +35,12 @@ const propertySlice = createSlice({
     setGoogleAutoSuggestion: (state, action) => {
       state.googleAutoSuggestion = action.payload;
     },
+    setTrendingProjects: (state, action) => {
+      state.trendingProjects = action.payload;
+    },
+    setIntrestedProperties: (state, action) => {
+      state.intrestedProperties = action.payload;
+    },
   },
 });
 export const {
@@ -43,5 +51,7 @@ export const {
   setGoogleAutoSuggestion,
   setCities,
   setDeviceLocation,
+  setTrendingProjects,
+  setIntrestedProperties,
 } = propertySlice.actions;
 export default propertySlice.reducer;

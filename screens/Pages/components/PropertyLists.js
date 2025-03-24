@@ -1,14 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef, memo } from "react";
 import {
-  Share,
-  RefreshControl,
   ScrollView,
-  Dimensions,
   TouchableOpacity,
   Platform,
   StyleSheet,
   TextInput,
-  ActivityIndicator,
 } from "react-native";
 import {
   FlatList,
@@ -24,7 +20,6 @@ import {
   VStack,
   Input,
   Icon,
-  Radio,
   Slider,
   Box,
 } from "native-base";
@@ -74,7 +69,6 @@ const PropertyCard = memo(({ item, onNavigate }) => {
           resizeMode="cover"
           rounded="lg"
         />
-
         <VStack flex={1} space={0.5}>
           <HStack justifyContent="space-between" alignItems="center">
             <Text fontSize="md" bold color="#1D3A76" numberOfLines={1}>
@@ -97,18 +91,18 @@ const PropertyCard = memo(({ item, onNavigate }) => {
                 item.property_status === 1
                   ? "green.300"
                   : item.property_status === 0
-                  ? "orange.300"
+                  ? "#f7d716"
                   : "blue.300"
               }
               bg={
                 item.property_status === 1
                   ? "green.100"
                   : item.property_status === 0
-                  ? "#FFF078"
+                  ? "#f7d716"
                   : "blue.100"
               }
               px={2}
-              py={1}
+              py={0.5}
               borderRadius={30}
               justifyContent="center"
             >
@@ -218,12 +212,14 @@ const formatToIndianCurrency = (value) => {
   if (value >= 1000) return (value / 1000).toFixed(2) + " K";
   return value.toString();
 };
-export default function PropertyLists() {
+export default function PropertyLists({ route }) {
+  const { prevLocation, prevSearch } = route.params || {};
   const dispatch = useDispatch();
   const flatListRef = useRef(null);
   const navigation = useNavigation();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [propertyLoading, setPropertyLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
@@ -233,6 +229,14 @@ export default function PropertyLists() {
   const [propertyTypeOptions, setPropertyTypeOptions] = useState([]);
   const [bhkOptions, setBhkOptions] = useState([]);
   const [possessionOptions, setPossessionOptions] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [filteredLocations, setFilteredLocations] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState([]);
+  const { isOpen, onOpen, onClose } = useDisclose();
+  const cities = useSelector((state) => state.property.cities, shallowEqual);
+  const [suggestions, setSuggestions] = useState([]);
+  const [recentSuggestions, setRecentSuggestions] = useState([]);
   const {
     isOpen: isFilterOpen,
     onOpen: onOpenFilter,
@@ -240,7 +244,7 @@ export default function PropertyLists() {
   } = useDisclose();
   const [userDetails, setUserDetails] = useState(null);
   const [filters, setFilters] = useState({
-    property_for: "Sell",
+    property_for: "",
     property_type: "",
     bedrooms: "",
     possession_status: "",
@@ -252,10 +256,9 @@ export default function PropertyLists() {
   };
   const applyFilters = () => {
     setPage(1);
-    fetchProperties(true, filters);
+    fetchProperties(true, filters, "Hyderabad");
     onCloseFilter();
   };
-
   const clearAllFilters = () => {
     setFilters({
       property_for: "Sell",
@@ -276,11 +279,11 @@ export default function PropertyLists() {
       max_price_range: 30000000,
     });
   };
-
   useEffect(() => {
     setPropertyForOptions([
       { id: "Buy", label: "Buy", value: "Sell" },
       { id: "Rent", label: "Rent", value: "Rent" },
+      { id: "None", label: "None", value: "" },
     ]);
     setPropertyTypeOptions(
       [
@@ -324,82 +327,125 @@ export default function PropertyLists() {
       },
     ]);
   }, []);
+  const locationCacheRef = useRef({});
   const fetchProperties = useCallback(
-    async (reset = false, appliedFilters = filters) => {
-      const storedDetails = await AsyncStorage.getItem("userdetails");
-      console.log("storedDetails: ", storedDetails);
-      if (!storedDetails) {
-        return;
-      }
-      const parsedUserDetails = JSON.parse(storedDetails);
-      setUserDetails(parsedUserDetails);
+    async (reset = false, appliedFilters = filters, searchedLocation) => {
+      setPropertyLoading(true);
       try {
-        const cityId = await AsyncStorage.getItem("city_id");
-        console.log("cityId: ", cityId);
-        const data1 = JSON.parse(cityId);
-        console.log("data1: ", data1);
+        const [storedDetails, cityId] = await Promise.all([
+          AsyncStorage.getItem("userdetails"),
+          AsyncStorage.getItem("city_id"),
+        ]);
+        if (!storedDetails) {
+          setPropertyLoading(false);
+          return;
+        }
+        const parsedUserDetails = JSON.parse(storedDetails);
+        setUserDetails(parsedUserDetails);
+        const cityData = cityId ? JSON.parse(cityId) : null;
+        const locationToSearch = (
+          searchedLocation ||
+          prevSearch ||
+          "Hyderabad"
+        ).toLowerCase();
+        const pageToFetch = reset ? 1 : page;
+        if (
+          locationCacheRef.current[locationToSearch] &&
+          !reset &&
+          pageToFetch === 1
+        ) {
+          setProperties(locationCacheRef.current[locationToSearch]);
+          setHasMore(true);
+          setPropertyLoading(false);
+          return;
+        }
+        const queryParams = new URLSearchParams({
+          searched_location: locationToSearch,
+          searched_city: prevLocation?.value || cityData?.value || "Hyderabad",
+          searched_property_for: appliedFilters.property_for || "",
+          searched_property_sub: appliedFilters.property_type || "",
+          searched_occupancy: appliedFilters.possession_status || "",
+          searched_min_price: appliedFilters.min_price_range || "",
+          searched_max_price: appliedFilters.max_price_range || "",
+          page: pageToFetch,
+          limit: limit,
+        }).toString();
         const response = await fetch(
-          `https://api.meetowner.in/listings/getallpropertiesnew?searched_location=Hyderabad&searched_city=${
-            data1 ? parseInt(data1.value, 10) : ""
-          }&searched_property_for=${
-            appliedFilters.property_for
-          }&searched_property_sub=${
-            appliedFilters.property_type
-          }&searched_occupancy=${
-            appliedFilters.possession_status
-          }&searched_min_price=${
-            appliedFilters.min_price_range
-          }&searched_max_price=${appliedFilters.max_price_range}&page=${
-            reset ? 1 : page
-          }&limit=${limit}`
+          `https://api.meetowner.in/listings/getallpropertiesnew?${queryParams}`
         );
         const data = await response.json();
-        console.log("data: ", data.propertiesData[0]);
-        if (data.propertiesData && data.propertiesData.length > 0) {
+        if (data?.propertiesData?.length > 0) {
           setProperties((prev) =>
             reset ? data.propertiesData : [...prev, ...data.propertiesData]
           );
           setPage(reset ? 2 : page + 1);
           setHasMore(true);
+          if (reset || pageToFetch === 1) {
+            locationCacheRef.current[locationToSearch] = data.propertiesData;
+          }
         } else {
+          if (reset) setProperties([]);
           setHasMore(false);
         }
       } catch (error) {
-        console.log("Error fetching properties:", error.message);
-        setProperties([]);
+        console.error("Error fetching properties:", error);
+        if (reset) setProperties([]);
         setHasMore(false);
       } finally {
-        setLoading(false);
+        setPropertyLoading(false);
         if (reset) setRefreshing(false);
       }
     },
-    [filters, page, limit]
+    [filters, page, limit, prevSearch, prevLocation]
   );
-
-  const [locations, setLocations] = useState([]);
-  const [filteredLocations, setFilteredLocations] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState([]);
-  const { isOpen, onOpen, onClose } = useDisclose();
-  const cities = useSelector((state) => state.property.cities, shallowEqual);
-  const [suggestions, setSuggestions] = useState([]);
-  console.log("suggestions: ", suggestions);
+  const MAX_CACHE_SIZE = 5;
+  useEffect(() => {
+    loadRecentSuggestions();
+  }, []);
+  const loadRecentSuggestions = async () => {
+    try {
+      const cachedSuggestions = await AsyncStorage.getItem("recentSuggestions");
+      if (cachedSuggestions) {
+        setRecentSuggestions(JSON.parse(cachedSuggestions));
+      }
+    } catch (error) {
+      console.error("Error loading cached suggestions:", error);
+    }
+  };
+  const saveToCache = async (newSuggestion) => {
+    try {
+      let updatedSuggestions = [newSuggestion, ...recentSuggestions];
+      updatedSuggestions = Array.from(
+        new Map(updatedSuggestions.map((item) => [item.id, item])).values()
+      ).slice(0, MAX_CACHE_SIZE);
+      await AsyncStorage.setItem(
+        "recentSuggestions",
+        JSON.stringify(updatedSuggestions)
+      );
+      setRecentSuggestions(updatedSuggestions);
+    } catch (error) {
+      console.error("Error saving suggestions to cache:", error);
+    }
+  };
   const fetchSuggestions = async (city_id, query) => {
-    console.log("city_id, query: ", city_id, query);
     setLoading(true);
     try {
       const response = await fetch(
         `${config.awsApiUrl}/general/getlocalitiesbycitynamenew?city_id=${city_id}&input=${query}`
       );
       const data = await response.json();
-      console.log("data: ", data);
       if (data?.status === "success") {
-        setSuggestions((data?.places).slice(0, 10) || []);
+        const apiSuggestions = (data?.places || []).slice(0, 10);
+        setSuggestions([...recentSuggestions, ...apiSuggestions]);
+        if (apiSuggestions.length > 0) {
+          saveToCache(apiSuggestions[0]);
+        }
       } else {
-        setSuggestions([]);
+        setSuggestions(recentSuggestions);
       }
     } catch (error) {
       console.error("Error fetching autocomplete suggestions:", error);
+      setSuggestions(recentSuggestions);
     } finally {
       setLoading(false);
     }
@@ -424,7 +470,6 @@ export default function PropertyLists() {
             AsyncStorage.setItem("city_id", JSON.stringify(data));
             dispatch(setCityId(data));
           } else {
-            console.log("City not found in list");
           }
         }
       } catch (error) {
@@ -475,17 +520,23 @@ export default function PropertyLists() {
           value: matchedCity.value,
         });
       } else {
-        console.log("City not found in the list");
         setSelectedLocation(null);
       }
     }
   }, [cities, userLocation]);
   useEffect(() => {
-    fetchProperties(true, filters);
-  }, [filters]);
+    setSearchQuery(prevSearch || "");
+    if (prevLocation) {
+      setSelectedLocation(prevLocation);
+    }
+    if (prevSearch || prevLocation) {
+      fetchProperties(true, filters, prevSearch || "Hyderabad");
+    } else {
+      fetchProperties(true, filters, "Hyderabad");
+    }
+  }, [prevSearch, prevLocation, filters]);
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log("Auto-refreshing after 2 minutes...");
       onRefresh();
     }, 2 * 60 * 1000);
     return () => clearInterval(interval);
@@ -530,7 +581,6 @@ export default function PropertyLists() {
     setPage(1);
     fetchProperties(true);
   };
-
   const showFilterActionSheet = () => {
     onOpenFilter();
   };
@@ -550,94 +600,115 @@ export default function PropertyLists() {
       setFilteredLocations(filtered);
     }
   }, 300);
-  const handleLocationSearch = (query) => {
-    console.log("Searching locations for query: ", query);
+  const handleLocationSearch = async (query) => {
     setSearchQuery(query);
     if (query.trim() === "") {
       setSuggestions([]);
       return;
     }
     if (selectedLocation?.value) {
-      fetchSuggestions(selectedLocation.value, query);
+      await fetchSuggestions(selectedLocation.value, query);
     } else {
-      console.log("No city selected. Cannot fetch suggestions.");
-      setSuggestions([]);
+      await fetchProperties(true, filters, query);
     }
   };
   const handleCitySelect = (item) => {
-    console.log("item: ", item);
     setSelectedLocation(item);
     onClose();
   };
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <TouchableOpacity style={styles.cityButton} onPress={onOpen}>
-          <HStack space={1} alignItems="center">
-            <Ionicons name="location-outline" size={20} color="gray" />
-            <Text style={styles.cityText}>
-              {selectedLocation?.label || selectedLocation || "Select City"}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color="gray" />
-          </HStack>
-        </TouchableOpacity>
-        <View style={{ flex: 1, position: "relative" }}>
-          <TextInput
-            placeholder="Search location"
-            value={searchQuery}
-            onChangeText={(text) => {
-              handleLocationSearch(text);
-            }}
-            style={styles.textInput}
-          />
-        </View>
-        <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="search" size={20} color="gray" />
-        </TouchableOpacity>
-      </View>
-      <View
-        style={{
-          justifyContent: "center",
-          alignItems: "center",
-          flex: 1,
-          width: "90%",
-          alignSelf: "center",
-          zIndex: 1,
-        }}
-      >
-        {loading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="small" color="#999" />
-          </View>
-        ) : suggestions.length > 0 ? (
-          <FlatList
-            data={suggestions}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
+      <View style={{ width: "100%", position: "relative" }}>
+        <HStack justifyContent="space-between" p={2}>
+          <TouchableOpacity onPress={onOpen}>
+            <View flexDirection="row" gap={2}>
+              <Ionicons name="location-outline" size={20} color="red" />
+              <Text>
+                Choose properties in{" "}
+                <Text style={{ color: "blue", fontWeight: "bold" }}>
+                  {selectedLocation?.label || selectedLocation || "your City"}
+                </Text>
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </HStack>
+        <View style={styles.searchContainer}>
+          <View style={{ flex: 1, position: "relative" }}>
+            <TextInput
+              placeholder="Search City, Locality, Property, Projects"
+              value={searchQuery}
+              onChangeText={(text) => {
+                handleLocationSearch(text);
+              }}
+              style={styles.textInput}
+            />
+            {searchQuery.trim() !== "" && (
               <TouchableOpacity
-                style={styles.suggestionItem}
                 onPress={() => {
-                  setSearchQuery(item?.value || item?.label);
-                  setSuggestions([]);
+                  handleLocationSearch("");
+                  fetchProperties(false, filters, "Hyderabad");
                 }}
+                style={styles.cancelIcon}
               >
-                <Text style={styles.suggestionText}>{item?.label}</Text>
+                <Ionicons name="close-circle" size={22} color="gray.800" />
               </TouchableOpacity>
             )}
-            style={styles.suggestionsList}
-          />
+          </View>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => {
+              if (searchQuery.trim()) {
+                const searchedLocation = searchQuery.trim();
+                fetchProperties(true, filters, searchedLocation);
+              } else {
+                fetchProperties(false, filters, "Hyderabad");
+              }
+            }}
+          >
+            <Ionicons name="search" size={26} color="gray" />
+          </TouchableOpacity>
+        </View>
+        {suggestions.length > 0 ? (
+          <View style={[styles.suggestionsList]}>
+            <TouchableOpacity
+              onPress={() => {
+                setSuggestions([]);
+                fetchProperties(false, filters, "Hyderabad");
+              }}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close-circle" size={22} color="#000" />
+            </TouchableOpacity>
+            <FlatList
+              data={suggestions}
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.suggestionItem}
+                  onPress={() => {
+                    setSearchQuery(item?.value || item?.label);
+                    setSuggestions([]);
+                    setTimeout(() => {
+                      fetchProperties(
+                        true,
+                        filters,
+                        item?.value || "Hyderabad"
+                      );
+                    }, 0);
+                  }}
+                >
+                  <Text style={styles.suggestionText}>{item?.label}</Text>
+                </Pressable>
+              )}
+            />
+          </View>
         ) : null}
       </View>
-
-      <HStack
-        py={2}
-        mx={2}
-        position={"absolute"}
-        bottom={4}
-        zIndex={1}
-        right={2}
-        justifyContent={"flex-end"}
-      >
+      <HStack py={2} zIndex={1} right={1} justifyContent={"space-between"}>
+        <Text ml={3} fontWeight="bold" fontSize={20} color={"#000"}>
+          Best Deals
+        </Text>
         <TouchableOpacity onPress={showFilterActionSheet}>
           <View
             flexDirection={"row"}
@@ -646,7 +717,7 @@ export default function PropertyLists() {
             bg={"#1D3A76"}
             px={3}
             gap={2}
-            py={1}
+            py={0.5}
           >
             <Text fontSize={15} fontWeight={"bold"} color={"#fff"}>
               Filter
@@ -655,24 +726,36 @@ export default function PropertyLists() {
           </View>
         </TouchableOpacity>
       </HStack>
-      <FlatList
-        ref={flatListRef}
-        data={properties}
-        keyExtractor={(item, index) => `${item.unique_property_id}-${index}`}
-        renderItem={renderPropertyCard}
-        onEndReached={loadMoreProperties}
-        onEndReachedThreshold={0.1}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        updateCellsBatchingPeriod={50}
-        removeClippedSubviews={true}
-        ListFooterComponent={
-          loading && hasMore ? <Spinner size="lg" mt={5} /> : null
-        }
-      />
-
+      {propertyLoading && (
+        <View style={styles.loadingContainer}>
+          <Spinner size="lg" color="#1D3A76" />
+          <Text style={styles.loadingText}>Loading Properties...</Text>
+        </View>
+      )}
+      {properties ? (
+        <FlatList
+          ref={flatListRef}
+          data={properties}
+          keyExtractor={(item, index) => `${item.unique_property_id}-${index}`}
+          renderItem={renderPropertyCard}
+          onEndReached={loadMoreProperties}
+          onEndReachedThreshold={0.1}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={true}
+        />
+      ) : (
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <Text fontSize={18} fontWeight="bold">
+            No Properties Found
+          </Text>
+        </View>
+      )}
       {showScrollToTop && (
         <IconButton
           position="absolute"
@@ -685,7 +768,6 @@ export default function PropertyLists() {
           onPress={scrollToTop}
         />
       )}
-
       <Actionsheet isOpen={isOpen} onClose={onClose}>
         <Actionsheet.Content
           justifyContent={"flex-start"}
@@ -823,7 +905,6 @@ export default function PropertyLists() {
                   Clear All
                 </Text>
               </Pressable>
-
               <Pressable
                 onPress={applyFilters}
                 bg="#1D3A76"
@@ -846,6 +927,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+    paddingHorizontal: 10,
+    paddingTop: 2,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#1D3A76",
+  },
+  noDataText: {
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 16,
+    color: "#666",
   },
   headerContainer: {
     paddingBottom: 10,
@@ -855,16 +956,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
   },
-
   title: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#000",
   },
+  cancelIcon: {
+    position: "absolute",
+    right: 3,
+    top: "50%",
+    transform: [{ translateY: -10 }],
+  },
   searchContainer: {
     width: "100%",
-    marginTop: 5,
-    marginBottom: 5,
+    height: 60,
+    marginTop: 8,
+    marginBottom: 0,
     borderWidth: 0.5,
     borderRadius: 30,
     borderColor: "#ddd",
@@ -881,17 +988,16 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
   },
   cityButton: {
-    paddingHorizontal: 12,
     justifyContent: "center",
     alignItems: "center",
-    height: 50,
-    borderTopLeftRadius: 30,
-    borderBottomLeftRadius: 30,
-    backgroundColor: "#f9f9f9",
+    backgroundColor: "#1D3A76",
+    borderRadius: 30,
+    paddingHorizontal: 3,
+    paddingVertical: 3,
   },
   cityText: {
     fontSize: 14,
-    color: "#333",
+    color: "#fff",
   },
   textInput: {
     height: 50,
@@ -899,27 +1005,27 @@ const styles = StyleSheet.create({
     color: "#333",
     flex: 1,
     backgroundColor: "white",
+    paddingLeft: 25,
     paddingHorizontal: 10,
     borderRadius: 30,
   },
   iconButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 20,
     justifyContent: "center",
     alignItems: "center",
-    height: 50,
+    height: 60,
     borderTopRightRadius: 30,
     borderBottomRightRadius: 30,
     backgroundColor: "#f9f9f9",
   },
   fullWidthItem: {
     flex: 1,
-    width: "10%",
+    width: "100%",
     justifyContent: "flex-start",
     alignItems: "flex-start",
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-
   fullWidthText: {
     fontSize: 16,
     color: "#333",
@@ -931,24 +1037,43 @@ const styles = StyleSheet.create({
   },
   suggestionsList: {
     maxHeight: 150,
-    width: "100%",
+    width: "90%",
     backgroundColor: "#fff",
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
     position: "absolute",
-    top: 0,
+    top: "100%",
+    marginTop: 2,
+    left: "5%",
     zIndex: 999,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
   },
-
   suggestionItem: {
     paddingHorizontal: 15,
-    paddingVertical: 5,
+    paddingVertical: 8,
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
   },
   suggestionText: {
     fontSize: 16,
     color: "#333",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    zIndex: 1000,
+    padding: 5,
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    elevation: 3,
+  },
+  closeIcon: {
+    fontSize: 18,
+    color: "#000",
   },
 });

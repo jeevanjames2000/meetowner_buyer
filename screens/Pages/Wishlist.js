@@ -27,28 +27,32 @@ import { useNavigation } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import config from "../../config";
 export default function Wishlist() {
   const navigation = useNavigation();
-  const dispatch = useDispatch();
   const [state, setState] = useState([]);
   const { isOpen, onOpen, onClose } = useDisclose();
-  const removeItem = useCallback((id) => {
-    console.log("id: ", id);
-    handleInterestAPI(id, 1);
-    dispatch(removeFavourite(id));
-  }, []);
+  const [userInfo, setUserInfo] = useState("");
+  const removeItem = useCallback(
+    async (id) => {
+      await handleInterestAPI(id, 1);
+      fetchPropertyList(userInfo.user_id, "interested_property_fetch").then(
+        (newData) => {
+          setState(newData);
+        }
+      );
+    },
+    [userInfo.user_id]
+  );
   const formatToIndianCurrency = (value) => {
     if (value >= 10000000) return (value / 10000000).toFixed(2) + " Cr";
     if (value >= 100000) return (value / 100000).toFixed(2) + " L";
     if (value >= 1000) return (value / 1000).toFixed(2) + " K";
     return value?.toString();
   };
-  const shareItem = (id) => {
-    console.log("Share item with ID:", id);
-  };
+  const shareItem = (id) => {};
   const [enquiredItems, setEnquiredItems] = useState({});
-
   const handleEnquiry = (id) => {
     setEnquiredItems((prev) => ({
       ...prev,
@@ -77,7 +81,6 @@ export default function Wishlist() {
             h={180}
             resizeMode="cover"
           />
-
           <View
             position="absolute"
             top={2}
@@ -92,7 +95,6 @@ export default function Wishlist() {
               {item?.property_details?.property_for}
             </Text>
           </View>
-
           <HStack position="absolute" top={2} right={2} space={2}>
             <Pressable
               p={2}
@@ -113,7 +115,6 @@ export default function Wishlist() {
               <Ionicons name="share-social-outline" size={20} color="black" />
             </Pressable>
           </HStack>
-
           <View
             position="absolute"
             bottom={2}
@@ -164,7 +165,6 @@ export default function Wishlist() {
             )}
           </View>
         </View>
-
         <HStack justifyContent="space-between" px={3} py={1}>
           <View flex={1}>
             <Text fontSize="sm" bold color="gray.500" numberOfLines={1}>
@@ -177,7 +177,6 @@ export default function Wishlist() {
             </Text>
           </View>
         </HStack>
-
         <HStack justifyContent="space-between" px={3} py={1}>
           <View flex={1}>
             <Text fontSize="xs" bold color="gray.500" numberOfLines={1}>
@@ -185,7 +184,6 @@ export default function Wishlist() {
             </Text>
           </View>
         </HStack>
-
         <Pressable
           bg="#1D3A76"
           py={2}
@@ -203,18 +201,13 @@ export default function Wishlist() {
       </Pressable>
     );
   };
-
   const handleInterestAPI = async (id, action) => {
-    console.log("called", id, action, userInfo.user_id);
     try {
       await fetch(
         `${config.mainapi_url}/favourites_exe?user_id=${userInfo.user_id}&unique_property_id=${id}&intrst=1&action=${action}`
       );
-      console.log("loading api");
       fetchPropertyList(userInfo.user_id, "interested_property_fetch");
-    } catch (error) {
-      console.log("error: ", error);
-    }
+    } catch (error) {}
   };
   async function fetchPropertyList(user_id, filterType) {
     let url = `${config.mainapi_url}/Api/newapi?fetchtype=${filterType}&user_id=347`;
@@ -225,7 +218,6 @@ export default function Wishlist() {
       });
       const udata = await response.json();
       const { data } = udata;
-      console.log("response: ", data);
       if (response.ok) {
         setState(data);
       }
@@ -235,17 +227,27 @@ export default function Wishlist() {
       setIsLoadingEffect(false);
     }
   }
-  const [userInfo, setUserInfo] = useState("");
-  console.log("userInfo: ", userInfo);
   useEffect(() => {
-    fetchPropertyList(userInfo.user_id, "interested_property_fetch");
     const getData = async () => {
       const data = await AsyncStorage.getItem("userdetails");
       const parsedUserDetails = JSON.parse(data);
       setUserInfo(parsedUserDetails);
+      if (parsedUserDetails?.user_id) {
+        fetchPropertyList(
+          parsedUserDetails.user_id,
+          "interested_property_fetch"
+        );
+      }
     };
     getData();
   }, []);
+  useFocusEffect(
+    useCallback(() => {
+      if (userInfo?.user_id) {
+        fetchPropertyList(userInfo.user_id, "interested_property_fetch");
+      }
+    }, [userInfo?.user_id])
+  );
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea}>

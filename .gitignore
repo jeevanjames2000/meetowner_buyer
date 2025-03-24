@@ -37,3 +37,7 @@ yarn-error.*
 
 
 /android
+/credentials
+@meetowner__meetowner.jks
+google-services.json
+meetownerin-2aa7b-firebase-adminsdk-77ko0-f0e25bf9e8.json

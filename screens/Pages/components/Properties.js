@@ -23,169 +23,190 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSelector, useDispatch } from "react-redux";
-import { addFavourite } from "../../../store/slices/favourites";
-import { setPropertyDetails } from "../../../store/slices/propertyDetails";
+import {
+  setIntrestedProperties,
+  setTrendingProjects,
+  setPropertyDetails,
+} from "../../../store/slices/propertyDetails";
 import config from "../../../config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-const PropertyCard = memo(({ item, onPress, onFav, onShare, onNavigate }) => {
-  return (
-    <Pressable
-      bg="white"
-      rounded="lg"
-      shadow={3}
-      overflow="hidden"
-      mb={3}
-      borderWidth={1}
-      borderColor="gray.200"
-      onPress={() => onNavigate(item)}
-    >
-      <View position="relative">
-        <Image
-          source={{
-            uri: `https://api.meetowner.in/uploads/${
-              item.image || "https://via.placeholder.com/160x130?text=No+Image"
-            }`,
-            cache: "force-cache",
-          }}
-          alt="Property Image"
-          w="100%"
-          h={180}
-          resizeMode="cover"
-        />
-        <View
-          position="absolute"
-          top={2}
-          left={2}
-          bg="white:alpha.80"
-          px={3}
-          py={1}
-          rounded="md"
-          opacity={0.75}
-        >
-          <Text color="black" fontSize="xs" bold>
-            {item.property_for}
-          </Text>
-        </View>
-        <HStack position="absolute" top={2} right={2} space={2}>
-          <Pressable
-            p={2}
-            bg="white"
-            rounded="full"
-            onPress={() => onFav(item, item.isLiked)}
-          >
-            <Ionicons
-              name={item.isLiked ? "heart" : "heart-outline"}
-              size={20}
-              color={item.isLiked ? "red" : "black"}
-            />
-          </Pressable>
-          <Pressable
-            p={2}
-            bg="white"
-            rounded="full"
-            onPress={() => onShare(item)}
-          >
-            <Ionicons name="share-social-outline" size={20} color="black" />
-          </Pressable>
-        </HStack>
-        <View
-          position="absolute"
-          bottom={2}
-          left={2}
-          right={2}
-          flexDirection="row"
-          justifyContent="left"
-          gap={3}
-        >
-          {item.bedrooms && (
-            <HStack
-              bg="white:alpha.80"
-              px={2}
-              py={1}
-              rounded="lg"
-              alignItems="center"
-            >
-              <Text color="black" fontSize="xs">
-                {item.bedrooms} BHK
-              </Text>
-            </HStack>
-          )}
-          {item.bathrooms && (
-            <HStack
-              bg="white:alpha.80"
-              px={2}
-              py={1}
-              rounded="lg"
-              alignItems="center"
-            >
-              <Text color="black" fontSize="xs">
-                {item.bathrooms} Bath
-              </Text>
-            </HStack>
-          )}
-          {item.car_parking && (
-            <HStack
-              bg="white:alpha.80"
-              px={2}
-              py={1}
-              rounded="lg"
-              alignItems="center"
-            >
-              <Text color="black" fontSize="xs">
-                {item.car_parking} Parking
-              </Text>
-            </HStack>
-          )}
-        </View>
-      </View>
-      <HStack justifyContent="space-between" px={3} py={1}>
-        <View flex={1}>
-          <Text fontSize="sm" bold color="gray.500" numberOfLines={1}>
-            {item.property_name}
-          </Text>
-        </View>
-        <View>
-          <Text fontSize="sm" bold color="gray.800">
-            ₹ {formatToIndianCurrency(item.property_cost)}
-          </Text>
-        </View>
-      </HStack>
-      <HStack justifyContent="space-between" px={3} py={1}>
-        <View flex={1}>
-          <Text fontSize="xs" bold color="gray.500" numberOfLines={1}>
-            {item.google_address}
-          </Text>
-        </View>
-      </HStack>
+const PropertyCard = memo(
+  ({ item, onPress, onFav, onShare, intrestedProperties }) => {
+    const isInitiallyInterested = (intrestedProperties || [])?.some(
+      (prop) =>
+        prop?.property_details?.unique_property_id === item?.unique_property_id
+    );
+    const [isLiked, setIsLiked] = useState(isInitiallyInterested);
+    const handleFavClick = (item) => {
+      onFav(item, !isLiked);
+      setIsLiked((prev) => !prev);
+    };
+    return (
       <Pressable
-        bg="#1D3A76"
-        py={2}
-        alignItems="center"
-        borderRadius={10}
-        width="95%"
-        alignSelf="center"
-        my={1}
+        bg="white"
+        rounded="lg"
+        shadow={3}
+        overflow="hidden"
         mb={3}
-        onPress={() => onNavigate(item)}
+        borderWidth={1}
+        borderColor="gray.200"
+        onPress={() => onPress(item)}
       >
-        <Text color="white" bold>
-          Enquire Now
-        </Text>
+        <View position="relative">
+          <Image
+            source={{
+              uri: `https://api.meetowner.in/uploads/${
+                item?.image ||
+                "https://via.placeholder.com/160x130?text=No+Image"
+              }`,
+              cache: "force-cache",
+            }}
+            alt="Property Image"
+            w="100%"
+            h={180}
+            resizeMode="cover"
+          />
+          <View
+            position="absolute"
+            top={2}
+            left={2}
+            bg="white:alpha.80"
+            px={3}
+            py={1}
+            rounded="md"
+            opacity={0.75}
+          >
+            <Text color="black" fontSize="xs" bold>
+              {item?.property_for}
+            </Text>
+          </View>
+          <HStack position="absolute" top={2} right={2} space={2}>
+            <Pressable
+              p={2}
+              bg="white"
+              rounded="full"
+              onPress={() => handleFavClick(item)}
+            >
+              <Ionicons
+                name={isLiked ? "heart" : "heart-outline"}
+                size={20}
+                color={isLiked ? "red" : "black"}
+              />
+            </Pressable>
+            <Pressable
+              p={2}
+              bg="white"
+              rounded="full"
+              onPress={() => onShare(item)}
+            >
+              <Ionicons name="share-social-outline" size={20} color="black" />
+            </Pressable>
+          </HStack>
+          <View
+            position="absolute"
+            bottom={2}
+            left={2}
+            right={2}
+            flexDirection="row"
+            justifyContent="left"
+            gap={3}
+          >
+            {item?.bedrooms && (
+              <HStack
+                bg="white:alpha.80"
+                px={2}
+                py={1}
+                rounded="lg"
+                alignItems="center"
+              >
+                <Text color="black" fontSize="xs">
+                  {item?.bedrooms ? `${item?.bedrooms} BHK` : "N/A"}
+                </Text>
+              </HStack>
+            )}
+            {item?.bathrooms && (
+              <HStack
+                bg="white:alpha.80"
+                px={2}
+                py={1}
+                rounded="lg"
+                alignItems="center"
+              >
+                <Text color="black" fontSize="xs">
+                  {item?.bathrooms} Bath
+                </Text>
+              </HStack>
+            )}
+            {item.car_parking && (
+              <HStack
+                bg="white:alpha.80"
+                px={2}
+                py={1}
+                rounded="lg"
+                alignItems="center"
+              >
+                <Text color="black" fontSize="xs">
+                  {item?.car_parking} Parking
+                </Text>
+              </HStack>
+            )}
+          </View>
+        </View>
+        <HStack justifyContent="space-between" px={3} py={1}>
+          <View flex={1}>
+            <Text fontSize="sm" bold color="gray.500" numberOfLines={1}>
+              {item?.property_name}
+            </Text>
+          </View>
+          <View>
+            <Text fontSize="sm" bold color="gray.800">
+              ₹{" "}
+              {item?.property_cost
+                ? formatToIndianCurrency(item?.property_cost)
+                : "N/A"}
+            </Text>
+          </View>
+        </HStack>
+        <HStack justifyContent="space-between" px={3} py={1}>
+          <View flex={1}>
+            <Text fontSize="xs" bold color="gray.500" numberOfLines={1}>
+              {item?.google_address}
+            </Text>
+          </View>
+        </HStack>
+        <Pressable
+          bg="#1D3A76"
+          py={2}
+          alignItems="center"
+          borderRadius={10}
+          width="95%"
+          alignSelf="center"
+          my={1}
+          mb={3}
+          onPress={() => onPress(item)}
+        >
+          <Text color="white" bold>
+            Enquire Now
+          </Text>
+        </Pressable>
       </Pressable>
-    </Pressable>
-  );
-});
+    );
+  }
+);
 const formatToIndianCurrency = (value) => {
-  if (value >= 10000000) return (value / 10000000).toFixed(2) + " Cr";
-  if (value >= 100000) return (value / 100000).toFixed(2) + " L";
-  if (value >= 1000) return (value / 1000).toFixed(2) + " K";
-  return value.toString();
+  if (!value || isNaN(value)) return "N/A";
+  const numValue = parseFloat(value);
+  if (numValue >= 10000000) return (numValue / 10000000).toFixed(2) + " Cr";
+  if (numValue >= 100000) return (numValue / 100000).toFixed(2) + " L";
+  if (numValue >= 1000) return (numValue / 1000).toFixed(2) + " K";
+  return numValue.toString();
 };
 export default function Properties({ activeTab }) {
+  const intrests = useSelector((state) => state.property.intrestedProperties);
   const dispatch = useDispatch();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(5);
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
@@ -193,73 +214,70 @@ export default function Properties({ activeTab }) {
   const navigation = useNavigation();
   const { isOpen, onOpen, onClose } = useDisclose();
   const [userInfo, setUserInfo] = useState("");
-  console.log("userInfo: ", userInfo);
-  const fetchProperties = useCallback(
-    async (reset = false) => {
-      setLoading(true);
-      if (reset) {
-        const cachedData = await AsyncStorage.getItem("cached_properties");
-        if (cachedData) {
-          setProperties(JSON.parse(cachedData));
-          setLoading(false);
-          setHasMore(true);
-          return;
-        }
-      }
-      const city = await AsyncStorage.getItem("city_id");
-      const cityId = JSON.parse(city);
-      try {
-        const response = await fetch(
-          `https://api.meetowner.in/listings/getlatestproperties?limit=${
-            reset ? 30 : 10
-          }&type_of_property=${activeTab}&city_id=6&page=${reset ? 1 : page}`
-        );
-        const data = await response.json();
-        if (data.propertiesData && data.propertiesData.length > 0) {
-          const newProperties = reset
-            ? data.propertiesData
-            : [...properties, ...data.propertiesData];
-          setProperties(newProperties);
-          setPage(reset ? 2 : page + 1);
-          setHasMore(data.propertiesData.length === (reset ? 30 : 10));
-          if (reset) {
-            await AsyncStorage.setItem(
-              "cached_properties",
-              JSON.stringify(data.propertiesData.slice(0, 10))
-            );
-          }
-        } else {
-          setHasMore(false);
-        }
-      } catch (error) {
-        console.log("Error fetching properties:", error.message);
-      } finally {
-        setLoading(false);
-        if (reset) setRefreshing(false);
-      }
-    },
-    [activeTab, page, properties]
-  );
 
+  const fetchProperties = useCallback(async (reset = false) => {
+    setLoading(true);
+    if (reset) {
+      const cachedData = await AsyncStorage.getItem("cached_properties");
+      if (cachedData) {
+        setProperties(JSON.parse(cachedData));
+        setLoading(false);
+        setHasMore(true);
+        return;
+      }
+    }
+    try {
+      const response = await fetch(
+        `https://api.meetowner.in/listings/getlatestproperties?limit=100&type_of_property=${activeTab}&city_id=4&page=${
+          reset ? 1 : page
+        }`
+      );
+      const data = await response.json();
+      if (data.propertiesData && data.propertiesData.length > 0) {
+        const newProperties = reset
+          ? data.propertiesData
+          : [...properties, ...data.propertiesData];
+        setProperties(newProperties.slice(0, 10));
+        dispatch(setTrendingProjects(newProperties.slice(0, 10)));
+        setPage(reset ? 2 : page + 1);
+        setHasMore(data.propertiesData.length === (reset ? 30 : 10));
+        if (reset) {
+          await AsyncStorage.setItem(
+            "cached_properties",
+            JSON.stringify(data.propertiesData.slice(0, 8))
+          );
+        }
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+    } finally {
+      setLoading(false);
+      if (reset) setRefreshing(false);
+    }
+  }, []);
   const handleInterestAPI = async (unique_property_id, action) => {
     try {
       const response = await fetch(
-        `${config.mainapi_url}/favourites_exe?user_id=${userInfo?.user_id}&unique_property_id=${unique_property_id}&intrst=1&action=0`
+        `${config.mainapi_url}/favourites_exe?user_id=${userInfo?.user_id}&unique_property_id=${unique_property_id}&intrst=1&action=${action}`
       );
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
-
-      const contentLength = response.headers.get("content-length");
-      if (contentLength && parseInt(contentLength) === 0) {
-        return;
-      }
-
-      const data = await response.json();
     } catch (error) {
       console.error("Error:", error);
       Alert.alert("Error", "Something went wrong. Please try again.");
     }
+  };
+  const [intrest, setIntrests] = useState([]);
+  const fetchIntrestedProperties = async () => {
+    try {
+      const response = await fetch(
+        `https://meetowner.in/Api/newapi?fetchtype=interested_property_fetch&user_id=${userInfo?.user_id}`
+      );
+      const data = await response.json();
+      if (response.status === 200) {
+        dispatch(setIntrestedProperties(data.data));
+        setIntrests(data.data);
+      }
+    } catch (error) {}
   };
   useEffect(() => {
     const getData = async () => {
@@ -269,10 +287,10 @@ export default function Properties({ activeTab }) {
     };
     getData();
     fetchProperties(true);
-  }, [activeTab]);
+    fetchIntrestedProperties();
+  }, []);
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log("Auto-refreshing after 2 minutes...");
       fetchProperties(true);
     }, 2 * 60 * 1000);
     return () => clearInterval(interval);
@@ -282,15 +300,12 @@ export default function Properties({ activeTab }) {
       await Share.share({
         message: `https://api.meetowner.in/property?unique_property_id=${property.unique_property_id}`,
       });
-    } catch (error) {
-      console.log("error", error.message);
-    }
+    } catch (error) {}
   };
   const handleFavourites = useCallback(async (item, isLiked) => {
     try {
       const action = isLiked ? 0 : 1;
-      console.log("item, isLiked: ", item.unique_property_id, action);
-      handleInterestAPI(item.unique_property_id, action);
+      await handleInterestAPI(item.unique_property_id, action);
     } catch (error) {
       console.error("Error updating favourites:", error.message);
     }
@@ -298,24 +313,32 @@ export default function Properties({ activeTab }) {
   const handleShare = useCallback((item) => {
     shareProperty(item);
   }, []);
-  const handleNavigate = useCallback(
-    (item) => {
-      dispatch(setPropertyDetails(item));
-      navigation.navigate("PropertyDetails");
-    },
-    [navigation]
-  );
+  const handleNavigate = useCallback((item) => {
+    dispatch(setPropertyDetails(item));
+    navigation.navigate("PropertyDetails");
+  }, []);
   const renderPropertyCard = useCallback(
-    ({ item }) => (
-      <PropertyCard
-        item={item}
-        onPress={() => handleNavigate(item)}
-        onFav={() => handleFavourites(item)}
-        onShare={() => handleShare(item)}
-        onNavigate={() => handleNavigate(item)}
-      />
-    ),
-    [handleFavourites, handleShare, handleNavigate]
+    ({ item }) => {
+      if (!item || !item.unique_property_id) {
+        console.warn("Invalid item:", item);
+        return null;
+      }
+      const isLiked = intrest?.some(
+        (prop) =>
+          prop?.property_details?.unique_property_id ===
+          item?.unique_property_id
+      );
+      return (
+        <PropertyCard
+          item={item}
+          onPress={(item) => handleNavigate(item)}
+          onFav={(item, isLiked) => handleFavourites(item, isLiked)}
+          onShare={(item) => handleShare(item)}
+          isLiked={isLiked}
+        />
+      );
+    },
+    [handleFavourites, handleShare, handleNavigate, intrest]
   );
   const handleScroll = (event) => {
     const offsetY = event.nativeEvent.contentOffset.y;
@@ -352,7 +375,7 @@ export default function Properties({ activeTab }) {
               bg={"#1D3A76"}
               px={3}
               gap={2}
-              py={1}
+              py={0.5}
             >
               <Text fontSize={15} fontWeight={"bold"} color={"#fff"}>
                 Filter
@@ -401,13 +424,11 @@ export default function Properties({ activeTab }) {
             </Pressable>
           </Actionsheet.Content>
         </Actionsheet>
-        <View style={{ flex: 1, paddingBottom: 50 }}>
+        <View style={{ flex: 1, paddingBottom: 80 }}>
           <FlatList
             ref={flatListRef}
             data={properties}
-            keyExtractor={(item, index) =>
-              `${item.unique_property_id}-${index}`
-            }
+            keyExtractor={(item) => item?.unique_property_id}
             renderItem={renderPropertyCard}
             onScroll={handleScroll}
             scrollEventThrottle={16}
@@ -418,33 +439,8 @@ export default function Properties({ activeTab }) {
             updateCellsBatchingPeriod={50}
             removeClippedSubviews={true}
             contentContainerStyle={{ paddingBottom: 80 }}
-            ListFooterComponent={() =>
-              hasMore && (
-                <View
-                  style={{
-                    marginBottom: 40,
-                    alignItems: "center",
-                    width: "100%",
-                  }}
-                >
-                  <Button
-                    borderRadius={30}
-                    width={"30%"}
-                    py={1}
-                    bgColor={"#FBAF01"}
-                    onPress={() => fetchProperties(false)}
-                    isLoading={loading}
-                    disabled={loading || !hasMore}
-                  >
-                    <Text color={"#000"}>
-                      {loading ? "Loading..." : "Load More"}
-                    </Text>
-                  </Button>
-                </View>
-              )
-            }
             ListEmptyComponent={() =>
-              !loading && <Text>No properties found for {activeTab}.</Text>
+              !loading && <Text textAlign={"center"}>No properties found.</Text>
             }
           />
         </View>

@@ -99,7 +99,6 @@ export default function OtpScreen() {
           >
             <Ionicons name="arrow-back" size={26} color="#000" />
           </TouchableOpacity>
-
           <View style={styles.otpView}>
             <Text style={styles.title}>Enter the OTP sent to</Text>
             <Text style={styles.subtitle}>(+91) {mobile}</Text>

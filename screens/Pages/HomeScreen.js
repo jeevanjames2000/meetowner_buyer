@@ -5,19 +5,22 @@ import {
   SafeAreaView,
   Platform,
   KeyboardAvoidingView,
-  Alert,
 } from "react-native";
 import { FlatList, StatusBar } from "native-base";
 import HerosSection from "./components/HerosSection";
 import Properties from "./components/Properties";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from "@react-navigation/native";
 
 export default function HomeScreen() {
+  const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState("Sell");
   const handleActiveTab = (tab) => {
     setActiveTab(tab);
   };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -62,6 +65,6 @@ const styles = StyleSheet.create({
     height: 70,
   },
   flatListContainer: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
   },
 });

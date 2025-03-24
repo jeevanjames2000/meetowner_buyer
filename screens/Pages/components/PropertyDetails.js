@@ -4,6 +4,8 @@ import MapView, { Marker } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import { useSelector } from "react-redux";
 import { Button, HStack, VStack, View, Text } from "native-base";
+import { useEffect } from "react";
+import axios from "axios";
 export default function PropertyDetails() {
   const property = useSelector((state) => state.property.propertyDetails);
   console.log("property: ", property);
@@ -11,14 +13,80 @@ export default function PropertyDetails() {
     if (value >= 10000000) return (value / 10000000).toFixed(2) + " Cr";
     if (value >= 100000) return (value / 100000).toFixed(2) + " L";
     if (value >= 1000) return (value / 1000).toFixed(2) + " K";
-    return value.toString();
+    return value;
   };
   const [showFullText, setShowFullText] = useState(false);
-
   const isLongText = property?.description?.length > 200;
   const displayText = showFullText
     ? property.description
     : property.description?.substring(0, 200) + (isLongText ? "..." : "");
+  const [location, setLocation] = useState(null);
+  console.log("location: ", location);
+  useEffect(() => {
+    getCoordinatesFromAddress(property.google_address);
+  }, [property?.google_address]);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [region, setRegion] = useState(null);
+  console.log("region: ", region);
+  const getCoordinatesFromAddress = async (address) => {
+    try {
+      console.log(`📡 Searching for address: ${address}`);
+      const response = await axios.get(
+        `https://maps.googleapis.com/maps/api/geocode/json`,
+        {
+          params: {
+            address: address,
+            key: "AIzaSyBmei9lRUUfJI-kLIPNBoc2SxEkwhKHyvU",
+          },
+        }
+      );
+      console.log("🔍 API Response:", response.data);
+      if (response?.data?.status === "OK" && response.data.results.length > 0) {
+        const { lat, lng } = response.data.results[0].geometry.location;
+        console.log(`✅ Found coordinates: Lat: ${lat}, Lng: ${lng}`);
+        const initialRegion = {
+          latitude: lat,
+          longitude: lng,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        };
+        setLocation(initialRegion);
+        setRegion(initialRegion);
+      } else {
+        console.warn("⚠️ No valid results found. Using fallback location.");
+        handleFallbackLocation();
+      }
+    } catch (error) {
+      console.error("❌ Error fetching coordinates:", error);
+      handleFallbackLocation();
+    }
+  };
+  const handleViewInMaps = () => {
+    if (location) {
+      const url = `https://www.google.com/maps?q=${location?.latitude},${location?.longitude}`;
+      Linking.openURL(url).catch((err) =>
+        console.error("An error occurred while opening the map:", err)
+      );
+    }
+  };
+  const handleZoomIn = () => {
+    if (region) {
+      setRegion((prevRegion) => ({
+        ...prevRegion,
+        latitudeDelta: prevRegion.latitudeDelta / 2,
+        longitudeDelta: prevRegion.longitudeDelta / 2,
+      }));
+    }
+  };
+  const handleZoomOut = () => {
+    if (region) {
+      setRegion((prevRegion) => ({
+        ...prevRegion,
+        latitudeDelta: prevRegion.latitudeDelta * 2,
+        longitudeDelta: prevRegion.longitudeDelta * 2,
+      }));
+    }
+  };
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.section}>
@@ -56,7 +124,6 @@ export default function PropertyDetails() {
             ₹ {formatToIndianCurrency(property.property_cost)}
           </Text>
         </View>
-
         <View flexDirection="row" justifyContent="space-between" mb={1}>
           <Text fontSize={12} color="gray.400">
             CONSTRUCTION PVT LTD...
@@ -65,13 +132,11 @@ export default function PropertyDetails() {
             All Inclusive Price
           </Text>
         </View>
-
         <View flexDirection="row" justifyContent="space-between" mb={4}>
           <Text fontSize="md" color="gray.400">
             {property?.google_address}
           </Text>
         </View>
-
         <View flexDirection="row" justifyContent="space-between" h={10} gap={2}>
           <Button bgColor="gray.800" borderRadius={30} w={"30%"}>
             Schedule Visit
@@ -85,8 +150,13 @@ export default function PropertyDetails() {
         </View>
       </HStack>
       <Image
-        source={{ uri: `https://meetowner.in/uploads/${property.image}` }}
+        source={
+          property.image
+            ? { uri: `https://meetowner.in/uploads/${property.image}` }
+            : { uri: `https://via.placeholder.com/160x130?text=No+Image` }
+        }
         style={styles.propertyImage}
+        resizeMode="cover"
       />
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Overview</Text>
@@ -131,7 +201,6 @@ export default function PropertyDetails() {
           </View>
         </View>
       </View>
-
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Facilities</Text>
         <View style={styles.card}>
@@ -150,25 +219,42 @@ export default function PropertyDetails() {
           </View>
         </View>
       </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Location</Text>
-        <MapView
-          style={styles.map}
-          initialRegion={{
-            latitude: 17.385044,
-            longitude: 78.486671,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
-        >
-          <Marker
-            coordinate={{ latitude: 17.385044, longitude: 78.486671 }}
-            title={property.property_name}
-            description={property.google_address}
-          />
-        </MapView>
+      <View>
+        {region ? (
+          <MapView
+            style={styles.map}
+            region={region}
+            onRegionChangeComplete={(newRegion) => setRegion(newRegion)}
+            showsScale={true}
+            loadingEnabled={true}
+          >
+            <Marker
+              coordinate={{
+                latitude: location?.latitude,
+                longitude: location?.longitude,
+              }}
+              title="New York"
+              description="This is a description"
+            />
+          </MapView>
+        ) : (
+          <Text style={styles.loadingText}>Loading map...</Text>
+        )}
+        <View style={styles.controls}>
+          <TouchableOpacity onPress={handleZoomIn} style={styles.button}>
+            <Text style={styles.buttonText}>+</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleZoomOut} style={styles.button}>
+            <Text style={styles.buttonText}>-</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-
+      <TouchableOpacity
+        className="flex justify-center items-center bg-[#00609E] py-3 rounded-md mt-1 mx-2"
+        onPress={handleViewInMaps}
+      >
+        <Text className="text-white text-[16px]">View in Maps</Text>
+      </TouchableOpacity>
       <View style={styles.ctaContainer}>
         <TouchableOpacity style={styles.ctaButton}>
           <Text style={styles.ctaButtonText}>Schedule Visit</Text>
@@ -177,7 +263,6 @@ export default function PropertyDetails() {
           <Text style={styles.ctaButtonText}>Contact Seller</Text>
         </TouchableOpacity>
       </View>
-
       <View style={styles.actionContainer}>
         <TouchableOpacity style={styles.actionButton}>
           <Ionicons name="heart-outline" size={24} color="red" />
@@ -201,6 +286,7 @@ const styles = StyleSheet.create({
     height: 250,
     borderRadius: 10,
     marginBottom: 16,
+    overflow: "hidden",
   },
   section: {
     marginBottom: 24,

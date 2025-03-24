@@ -15,6 +15,7 @@ import PropertyLists from "../Pages/components/PropertyLists";
 import Wishlist from "../Pages/Wishlist";
 import { Platform } from "react-native";
 import Support from "../Pages/Support";
+import SearchBox from "../Pages/components/SearchBox";
 const Stack = createNativeStackNavigator();
 const CustomHeader = ({ navigation, title, route }) => {
   return (
@@ -93,6 +94,19 @@ export default function MainNav() {
             name="Profile"
             component={Profile}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="SearchBox"
+            component={SearchBox}
+            options={({ navigation }) => ({
+              header: () => (
+                <CustomHeader
+                  navigation={navigation}
+                  title="Search Properties"
+                  route="Wishlist"
+                />
+              ),
+            })}
           />
           <Stack.Screen
             name="PropertyList"
